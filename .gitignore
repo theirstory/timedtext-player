@@ -1,0 +1,11 @@
+/node_modules/
+/lib/
+/test/
+custom-elements.json
+# top level source
+timedtext-player.js
+timedtext-player.js.map
+timedtext-player.d.ts
+timedtext-player.d.ts.map
+# only generated for size check
+timedtext-player.bundled.js
