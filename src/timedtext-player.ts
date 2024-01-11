@@ -13,7 +13,7 @@ export class TimedTextPlayer extends LitElement {
   @property({type: Number})
   time = 0;
 
-  @queryAll('section[data-media]')
+  @queryAll('section[data-media-src]')
   _sections!: NodeListOf<HTMLElement>;
 
   @queryAssignedElements({slot: 'transcript', selector: 'article'})
@@ -31,11 +31,11 @@ export class TimedTextPlayer extends LitElement {
   override render() {
     let sections: HTMLElement[] = [];
     Array.from(this._article).forEach((article) => {
-        sections = Array.from(article.querySelectorAll('section[data-media]'));
+        sections = Array.from(article.querySelectorAll('section[data-media-src]'));
     });
 
     return html`
-      ${sections.map(s => html`<video controls src=${s.getAttribute('data-media') ?? ''} @timeupdate=${this._onTimeUpdate}></video>`)}
+      ${sections.map(s => html`<video controls src=${s.getAttribute('data-media-src') ?? ''} @timeupdate=${this._onTimeUpdate}></video>`)}
       <p>Time: ${this.time}</p>
       <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot>
     `;
