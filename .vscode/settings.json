@@ -6,12 +6,13 @@
     "hyperaudio",
     "litelement",
     "onwarn",
+    "OTIO",
     "Parens",
     "saucelabs",
     "Slotchange",
+    "theirstory",
     "timedtext",
     "webcomponents",
-    "webcomponentsjs",
-    "theirstory"
+    "webcomponentsjs"
   ]
 }

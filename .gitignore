@@ -8,4 +8,6 @@ timedtext-player.js.map
 timedtext-player.d.ts
 timedtext-player.d.ts.map
 # only generated for size check
+# TODO: use it in dist?
 timedtext-player.bundled.js
+/dist/

@@ -10,9 +10,9 @@ import resolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 
 export default {
-  input: 'timedtext-player.js',
+  input: 'dist/timedtext-player.js',
   output: {
-    file: 'timedtext-player.bundled.js',
+    file: 'dist/timedtext-player.bundled.js',
     format: 'esm',
   },
   onwarn(warning) {
@@ -40,3 +40,5 @@ export default {
     summary(),
   ],
 };
+
+// TODO: sourcemaps + d.ts? https://gist.github.com/rikkit/b636076740dfaa864ce9ee8ae389b81c

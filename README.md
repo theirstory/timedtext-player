@@ -1,4 +1,8 @@
-# LitElement TypeScript starter
+# TimedText Player
+
+Based on https://github.com/lit/lit-element-starter-ts and https://github.com/TonySpegel/swipeable-element 
+
+## LitElement TypeScript starter
 
 This project includes a sample component using LitElement with TypeScript.
 
