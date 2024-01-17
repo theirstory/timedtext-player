@@ -31,67 +31,16 @@ export class TimedTextPlayer extends LitElement {
   @queryAssignedElements({slot: 'transcript', selector: 'article'})
   _article!: NodeListOf<HTMLElement>;
 
+  @queryAssignedElements({slot: 'transcript', selector: 'section[data-media-src]'})
+  _sections!: NodeListOf<HTMLElement>;
+
   // @queryAssignedElements()
   // unnamedSlotEls!: Array<HTMLElement>;
 
   @query('audio')
   _reference!: HTMLAudioElement;
 
-
-  override render() {
-    // ${sections.map(s => html`<video controls src=${s.getAttribute('data-media-src') ?? ''} @timeupdate=${this._onTimeUpdate}></video>`)}
-    const silence = "https://s3-eu-west-1.amazonaws.com/files.hyperaud.io/tmp/3600-silence.wav"; // createSilentAudio(this.duration, 44100);
-
-    return html`
-      <audio controls src=${silence} @timeupdate=${this._onTimeUpdate} @play=${this._onPlay} @pause=${this._onPause} style="width: 100%"></audio>
-      <p>Time: ${this.time}</p>
-      <hr />
-      ${this.track ? this.track.children.map((clip, i, arr) => {
-        const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
-        const duration = clip.source_range.duration;
-        return html`<video controls data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`} data-t2=${`${offset},${offset + duration}`} src=${clip.media_reference.target}></video>`;
-      }) : null}
-      <hr />
-      <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot>
-    `;
-  }
-
-  private _onTimeUpdate() {
-    this.time = this._reference.currentTime;
-    this._syncPlayers();
-  }
-
-  private _onPlay() {
-    this.playing = true;
-    this._syncPlayers();
-  }
-
-  private _onPause() {
-    this.playing = false;
-    this._syncPlayers();
-  }
-
-  private _syncPlayers() {
-    this._players.forEach((player) => {
-      const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-      const [start2, end2] = (player.getAttribute('data-t2') ?? '0,0' ).split(',').map(v => parseFloat(v));
-      if (start2 <= this.time && this.time <= end2) {
-        if (this.time - start2 + start - player.currentTime > 0.3) player.currentTime = this.time - start2 + start;
-        if (this.playing) {
-          player.play();
-        } else player.pause();
-      } else player.pause();
-    });
-  }
-
-  private handleSlotClick(e: MouseEvent & {target: HTMLElement}) {
-    console.log({e, s: window.getSelection()});
-  }
-
-  private handleSlotchange(e: Event & {target: HTMLSlotElement}) {
-    const childNodes = e.target.assignedNodes({flatten: true});
-    const article = childNodes.find((n) => n.nodeName === 'ARTICLE') as HTMLElement | undefined;
-    const sections: NodeListOf<HTMLElement> | undefined = article?.querySelectorAll('section[data-media-src]') ;
+  private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
     if (!sections) return;
 
     this.track = {
@@ -122,9 +71,96 @@ export class TimedTextPlayer extends LitElement {
 
     this.duration = this.track.children.reduce((acc, c) => acc + c.source_range.duration, 0);
     console.log({duration: this.duration});
-
-  // EOF
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private callback(mutationList: any, _observer: MutationObserver) {
+    let article;
+    for (const mutation of mutationList) {
+      if (mutation.type === "childList") {
+        console.log("A child node has been added or removed.");
+        article = mutation.target;
+      } else if (mutation.type === "attributes") {
+        console.log(`The ${mutation.attributeName} attribute was modified.`);
+      }
+    }
+
+    console.log({mutationList, _observer, article: article});
+    if (!article) return;
+    const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
+    console.log({sections});
+    this._dom2otio(sections);
+  }
+
+  _observer: MutationObserver | undefined = undefined;
+
+
+  override render() {
+    // ${sections.map(s => html`<video controls src=${s.getAttribute('data-media-src') ?? ''} @timeupdate=${this._onTimeUpdate}></video>`)}
+    const silence = "https://s3-eu-west-1.amazonaws.com/files.hyperaud.io/tmp/3600-silence.wav"; // createSilentAudio(this.duration, 44100);
+
+    return html`
+      <audio controls src=${silence} @timeupdate=${this._onTimeUpdate} @play=${this._onPlay} @pause=${this._onPause} style="width: 100%"></audio>
+      <p>Time: ${this.time}</p>
+      <hr />
+      ${this.track ? this.track.children.map((clip, i, arr) => {
+        const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
+        const duration = clip.source_range.duration;
+        return html`<video controls data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`} data-t2=${`${offset},${offset + duration}`} src=${clip.media_reference.target}></video>`;
+      }) : null}
+      <hr />
+      <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot>
+    `;
+  }
+
+  private _onTimeUpdate() {
+    this.time = this._reference.currentTime;
+    this._syncPlayers();
+    // console.log({time: this.time, article: this._article, sections: this._sections});
+  }
+
+  private _onPlay() {
+    this.playing = true;
+    this._syncPlayers();
+  }
+
+  private _onPause() {
+    this.playing = false;
+    this._syncPlayers();
+  }
+
+  private _syncPlayers() {
+    this._players.forEach((player) => {
+      const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+      const [start2, end2] = (player.getAttribute('data-t2') ?? '0,0' ).split(',').map(v => parseFloat(v));
+      if (start2 <= this.time && this.time <= end2) {
+        if (this.time - start2 + start - player.currentTime > 0.3) player.currentTime = this.time - start2 + start;
+        if (this.playing) {
+          player.play();
+        } else player.pause();
+      } else player.pause();
+    });
+  }
+
+  private handleSlotClick(e: MouseEvent & {target: HTMLElement}) {
+    console.log({e, s: window.getSelection()});
+  }
+
+  private handleSlotchange(e: Event & {target: HTMLSlotElement}) {
+    console.log('SLOT CHANGE');
+    const childNodes = e.target.assignedNodes({flatten: true});
+
+    const article = childNodes.find((n) => n.nodeName === 'ARTICLE') as HTMLElement | undefined;
+    if (!article) return;
+
+    this._observer = new MutationObserver(this.callback.bind(this));
+    this._observer.observe(article, { attributes: true, childList: true, subtree: true });
+
+    const sections: NodeListOf<HTMLElement> | undefined = article?.querySelectorAll('section[data-media-src]') ;
+    this._dom2otio(sections);
+  }
+
+
 
   // protected override createRenderRoot() {
   //   return this;
