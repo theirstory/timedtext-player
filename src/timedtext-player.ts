@@ -3,15 +3,12 @@
 import {LitElement, css} from 'lit';
 import {html, unsafeStatic} from 'lit/static-html.js';
 import {customElement, state, property, queryAll} from 'lit/decorators.js';
-import {queryAssignedElements} from 'lit/decorators/query-assigned-elements.js';
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      background-color: #eee;
-      line-height: 1.5em;
     }
     .active {
       outline: 4px solid red;
@@ -60,17 +57,31 @@ export class TimedTextPlayer extends LitElement {
     return this._duration;
   }
 
+  _muted = false;
+
+  set muted(muted: boolean) {
+    this._players.forEach((p) => p.muted = muted);
+  }
+
+  get muted() {
+    return this._muted;
+  }
+
+  _volume = 1;
+
+  get volume() {
+    return this._volume;
+  }
+
+  set volume(volume: number) {
+    this._players.forEach((p) => p.volume = volume);
+  }
+
   @property({type: Object})
   track: Track | null = null;
 
   @queryAll('*[data-t]')
   _players!: NodeListOf<HTMLMediaElement>;
-
-  // @queryAssignedElements({slot: 'transcript', selector: 'article'})
-  // _article!: NodeListOf<HTMLElement>;
-
-  // @queryAssignedElements()
-  // unnamedSlotEls!: Array<HTMLElement>;
 
   private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
     if (!sections) return;
@@ -179,20 +190,43 @@ export class TimedTextPlayer extends LitElement {
         const attrs = Array.from(node.attributes).map((attr) => `${(attr.name)}=${attr.value !== '' ? attr.value : '""' }`);
         // console.log({a: Array.from(node.attributes), attrs})
 
-
+        // TODO add node children
         return html`<${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
-            data-t2=${`${offset},${offset + duration}`}
+            data-offset=${offset}
+            class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
+
             @timeupdate=${this._onTimeUpdate}
             @canplay=${this._onCanPlay}
             @play=${this._onPlay}
             @pause=${this._onPause}
-            class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
+
+            @abort=${this._relayEvent}
+            @canplaythrough=${this._relayEvent}
+            @durationchange=${this._relayEvent}
+            @emptied=${this._relayEvent}
+            @ended=${this._relayEvent}
+            @loadeddata=${this._relayEvent}
+            @loadedmetadata=${this._relayEvent}
+            @loadstart=${this._relayEvent}
+            @playing=${this._relayEvent}
+            @progress=${this._relayEvent}
+            @ratechange=${this._relayEvent}
+            @seeked=${this._relayEvent}
+            @seeking=${this._relayEvent}
+            @suspend=${this._relayEvent}
+            @waiting=${this._relayEvent}
+            @error=${this._relayEvent}
+            @volumechange=${this._relayEvent}
           ></${unsafeStatic(tag)}>`;
       }) : null}
       <div style="height: 40px"></div>
       <!-- <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot> -->
     `;
+  }
+
+  private _relayEvent(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+    // this.dispatchEvent(new CustomEvent(e.type));
   }
 
   override connectedCallback() {
@@ -213,8 +247,9 @@ export class TimedTextPlayer extends LitElement {
   private _playerAtTime(time: number): HTMLMediaElement | undefined {
     const players = Array.from(this._players);
     return players.find((p) => {
-      const [start2, end2] = (p.getAttribute('data-t2') ?? '0,0' ).split(',').map(v => parseFloat(v));
-      return start2 <= time && time <= end2;
+      const [start, end] = (p.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+      const offset = parseFloat(p.getAttribute('data-offset') ?? '0');
+      return start <= time - offset && time - offset <= end;
     });
   }
 
@@ -227,15 +262,15 @@ export class TimedTextPlayer extends LitElement {
     if (!player) return;
 
     const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-    const [start2] = (player.getAttribute('data-t2') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
-    player.currentTime = time - start2 + start;
+    player.currentTime = time - offset + start;
   }
 
   private _onTimeUpdate(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     const {target: player} = e;
     const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-    const [start2] = (player.getAttribute('data-t2') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
     const players = Array.from(this._players);
     const i = players.indexOf(player as HTMLVideoElement);
@@ -245,11 +280,12 @@ export class TimedTextPlayer extends LitElement {
       player.currentTime = start;
       player.pause();
     } else if (start <= player.currentTime && player.currentTime <= end) {
-      if (player.currentTime !== start) this.time = player.currentTime - start + start2;
+      if (player.currentTime !== start) this.time = player.currentTime - start + offset;
       if (nextPlayer) {
         const [start3] = (nextPlayer.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
         if (nextPlayer.currentTime !== start3) nextPlayer.currentTime = start3;
       }
+      this.dispatchEvent(new CustomEvent('timeupdate'));
     } else if (end < player.currentTime) {
       player.pause();
       if (nextPlayer) nextPlayer.play();
@@ -268,6 +304,7 @@ export class TimedTextPlayer extends LitElement {
   private _onPlay(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     const {target: player} = e;
     const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+
     if (start <= player.currentTime && player.currentTime <= end) {
       this.playing = true;
       this.dispatchEvent(new CustomEvent('play'));
@@ -277,6 +314,7 @@ export class TimedTextPlayer extends LitElement {
   private _onPause(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     const {target: player} = e;
     const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+
     if (start <= player.currentTime && player.currentTime <= end) {
       this.playing = false;
       this.dispatchEvent(new CustomEvent('pause'));

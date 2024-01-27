@@ -26,9 +26,10 @@
         <media-time-range></media-time-range>
         <media-duration-display></media-duration-display>
       </media-control-bar>
+
       <timedtext-player slot="media" transcript="#transcript" player="#video1">
-        <!-- <div slot="test"></div> -->
       </timedtext-player>
+
     </media-controller>
 
     <template id="video1">
@@ -38,6 +39,7 @@
     <template id="video2">
       <youtube-video
         src="https://www.youtube.com/watch?v=NM-zWTU7X-k"
+        controls
         crossorigin
       ></youtube-video>
     </template>
