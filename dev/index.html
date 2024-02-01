@@ -87,5 +87,63 @@
       </section>
     </article>
 
+    <style>
+      #transcript section p span {
+        color: blue;
+      }
+    </style>
+    <style id="css"></style>
+    <script>
+      const player = document.querySelector('timedtext-player');
+      const transcript = document.querySelector('#transcript');
+      const css = document.querySelector('#css');
+
+      player.addEventListener('playhead', (e) => {
+        console.log(e.detail);
+
+        const { section, clip, timedText, offset } = e.detail;
+
+        if (false && timedText) {
+          const span = transcript?.querySelector(timedText.metadata.selector);
+
+          transcript.querySelectorAll('span').forEach((span) => {
+            span.style.backgroundColor = 'transparent';
+            span.style.outline = 'none';
+          });
+
+          if (span) {
+            span.style.outline = '2px solid blue';
+            timedText.metadata.element.style.backgroundColor = 'red';
+          }
+        }
+
+        if (timedText) {
+          const { selector, element } = timedText.metadata;
+
+          const cssText = `
+            ${selector} {
+              color: red !important;
+            }
+
+            ${selector} ~ span {
+              color: #cccccc !important;
+            }
+
+            ${section.metadata.selector} p span {
+              color: green;
+            }
+
+            ${section.metadata.selector} ~ section p span {
+              color: orange !important;
+            }
+          `;
+
+          css.textContent = cssText;
+        } else {
+          css.textContent = '';
+        }
+      });
+    </script>
+
   </body>
 </html>
