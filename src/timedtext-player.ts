@@ -32,6 +32,11 @@ export class TimedTextPlayer extends LitElement {
     return this.time;
   }
 
+  get seeking() {
+    const players = Array.from(this._players);
+    return players.some((p) => p.seeking);
+  }
+
   @state()
   playing = false;
 
@@ -232,7 +237,7 @@ export class TimedTextPlayer extends LitElement {
             @playing=${this._relayEvent}
             @progress=${this._relayEvent}
             @ratechange=${this._relayEvent}
-            @seeked=${this._relayEvent}
+            @seeked=${this._onSeeked}
             @seeking=${this._relayEvent}
             @suspend=${this._relayEvent}
             @waiting=${this._relayEvent}
@@ -248,6 +253,16 @@ export class TimedTextPlayer extends LitElement {
   private _relayEvent(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     // this.dispatchEvent(new CustomEvent(e.type));
     console.log(e.type);
+  }
+
+  private _onSeeked(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+    const {target: player} = e;
+    const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
+
+    if (start <= player.currentTime && player.currentTime <= end) {
+      if (this.playing && player.paused && player.currentTime - start + offset === this.time) player.play();
+    }
   }
 
   override connectedCallback() {
@@ -329,10 +344,16 @@ export class TimedTextPlayer extends LitElement {
     });
     if (!clip) return {section, clip: null, timedText: null};
 
-    const timedText = clip.timed_texts?.find((t) => {
+    const timedText = clip.timed_texts?.find((t) => { // find in range
       const start = t.marked_range.start_time;
       const end = t.marked_range.start_time + t.marked_range.duration;
       return start <= sourceTime && sourceTime <= end;
+    }) ?? clip.timed_texts?.find((t) => { // find in gap before
+      const start = t.marked_range.start_time;
+      return sourceTime < start;
+    }) ?? [...(clip?.timed_texts ?? [])].reverse().find((t) => { // find in gap after
+      const start = t.marked_range.start_time;
+      return start <= sourceTime;
     });
 
     return {section, clip, timedText};
@@ -343,37 +364,57 @@ export class TimedTextPlayer extends LitElement {
   _timedText = null;
   private _dispatchTimedTextEvent() {
     const {section, clip, timedText} = this._clipAtTime(this.time);
-    if (!section || !clip || !timedText) return;
+    if (!section || !clip) return;
 
     const sectionIndex = this.track?.children.indexOf(section);
     const offset = this.track?.children.slice(0, sectionIndex).reduce((acc, c) => acc + c.source_range.duration, 0);
 
-    if (this._section !== section) {
-      this.dispatchEvent(new CustomEvent('playhead', {detail: {section, offset}}));
-      this._section = section;
-    }
-    if (this._clip !== clip) {
-      this.dispatchEvent(new CustomEvent('playhead', {detail: {clip, section, offset}}));
-      this._clip = clip;
-    }
+    // if (this._section !== section) {
+    //   this.dispatchEvent(new CustomEvent('playhead', {detail: {section, offset}}));
+    //   this._section = section;
+    // }
+    // if (this._clip !== clip) {
+    //   this.dispatchEvent(new CustomEvent('playhead', {detail: {clip, section, offset}}));
+    //   this._clip = clip;
+    // }
     if (this._timedText !== timedText) {
       this.dispatchEvent(new CustomEvent('playhead', {detail: {timedText, clip, section, offset}}));
       this._timedText = timedText;
     }
   }
 
+
   private _seek(time: number) {
     const player = this._playerAtTime(time);
-    console.log('seek?',{time, duration: this.duration, player});
     if (!player) return;
+
+    const currentPlayer = this._currentPlayer();
 
     const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
+    const playing = !!this.playing;
+    if (playing && currentPlayer && currentPlayer !== player) currentPlayer.pause();
     player.currentTime = time - offset + start;
+    if (playing && currentPlayer && currentPlayer !== player) this.playing = true;
+  }
+
+
+  _triggerTimeUpdateTimeout = 0;
+  private _triggerTimeUpdate() {
+    clearTimeout(this._triggerTimeUpdateTimeout);
+    if (this.seeking) return;
+
+    const player = this._currentPlayer();
+    if (!player) return;
+
+    player.dispatchEvent(new Event('timeupdate'));
+    if (this.playing) this._triggerTimeUpdateTimeout = setTimeout(() => requestAnimationFrame(this._triggerTimeUpdate.bind(this)), 1000 / 15); // TODO better 15fps?
   }
 
   private _onTimeUpdate(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+    if (this.seeking) return;
+
     const {target: player} = e;
     const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
@@ -386,7 +427,8 @@ export class TimedTextPlayer extends LitElement {
       player.currentTime = start;
       player.pause();
     } else if (start <= player.currentTime && player.currentTime <= end) {
-      if (player.currentTime !== start) this.time = player.currentTime - start + offset;
+      // if (this.playing && player.paused && player.currentTime - start + offset === this.time) player.play();
+      if (player.currentTime !== start) this.time = player.currentTime - start + offset; // FIXME: that "if" to avoid 1st seek time update
       if (nextPlayer) {
         const [start3] = (nextPlayer.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
         if (nextPlayer.currentTime !== start3) nextPlayer.currentTime = start3;
@@ -416,9 +458,13 @@ export class TimedTextPlayer extends LitElement {
       this.playing = true;
       this.dispatchEvent(new CustomEvent('play'));
     }
+
+    this._triggerTimeUpdate();
   }
 
   private _onPause(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+    if (this.seeking) return;
+
     const {target: player} = e;
     const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
 

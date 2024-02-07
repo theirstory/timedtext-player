@@ -13,6 +13,26 @@
       html, body {
         min-height: 100vh;
       }
+
+      article {
+        margin-top: 4em;
+      }
+
+      article section {
+        border: 1px solid darkred;
+        padding: .7em;
+      }
+
+      article section + section {
+        margin-top: 2em;
+      }
+
+      section::before {
+        content: attr(data-t)' 'attr(data-media-src) ;
+        display: block;
+        font-size: 0.8em;
+        color: #666;
+      }
     </style>
   </head>
   <body>
@@ -88,8 +108,8 @@
     </article>
 
     <style>
-      #transcript section p span {
-        color: blue;
+      #transcript {
+        color: darkblue;
       }
     </style>
     <style id="css"></style>
@@ -129,12 +149,12 @@
               color: #cccccc !important;
             }
 
-            ${section.metadata.selector} p span {
-              _color: green;
+            ${clip.metadata.selector} ~ p {
+              color: #cccccc;
             }
 
-            ${section.metadata.selector} ~ section p span {
-              color: _orange !important;
+            ${section.metadata.selector} ~ section {
+              color: #cccccc;
             }
           `;
 
