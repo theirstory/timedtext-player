@@ -119,23 +119,7 @@
       const css = document.querySelector('#css');
 
       player.addEventListener('playhead', (e) => {
-        console.log(e.detail);
-
         const { section, clip, timedText, offset } = e.detail;
-
-        if (false && timedText) {
-          const span = transcript?.querySelector(timedText.metadata.selector);
-
-          transcript.querySelectorAll('span').forEach((span) => {
-            span.style.backgroundColor = 'transparent';
-            span.style.outline = 'none';
-          });
-
-          if (span) {
-            span.style.outline = '2px solid blue';
-            timedText.metadata.element.style.backgroundColor = 'red';
-          }
-        }
 
         if (timedText) {
           const { selector, element } = timedText.metadata;
@@ -160,7 +144,7 @@
 
           css.textContent = cssText;
         } else {
-          css.textContent = '';
+          // css.textContent = '';
         }
       });
     </script>
