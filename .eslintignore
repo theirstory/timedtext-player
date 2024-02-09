@@ -1,6 +1,6 @@
 node_modules/*
 docs/*
-docs-src/*
+docs-src/node_modules/*
 dist/*
 rollup-config.js
 custom-elements.json
