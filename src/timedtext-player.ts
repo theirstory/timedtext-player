@@ -6,7 +6,7 @@ import {customElement, state, property, queryAll} from 'lit/decorators.js';
 import {finder} from '@medv/finder';
 
 import {interpolate} from './utils';
-import {Clip, Gap, Metadata, TimedText, TimeRange, Track} from './interfaces';
+import {Clip, Gap, TimedText, Track} from './interfaces';
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
@@ -16,11 +16,16 @@ export class TimedTextPlayer extends LitElement {
     }
     .active {
       outline: 4px solid red;
-      /* display: block; */
+      /* display: block !important; */
     }
-    video {
+    *[data-t] {
       margin: 10px;
+    }
+    .wrapper {
+      position: relative;
+      display: inline-block;
       /* display: none; */
+      color: white;
     }
   `;
 
@@ -70,6 +75,7 @@ export class TimedTextPlayer extends LitElement {
 
   set muted(muted: boolean) {
     this._players.forEach((p) => p.muted = muted);
+    this._muted = muted;
   }
 
   get muted() {
@@ -86,7 +92,7 @@ export class TimedTextPlayer extends LitElement {
     this._players.forEach((p) => p.volume = volume);
   }
 
-  @property({type: Object}) // TODO make it state
+  @state()
   track: Track | null = null;
 
   @queryAll('*[data-t]') // TODO make it work with all players?
@@ -94,9 +100,9 @@ export class TimedTextPlayer extends LitElement {
 
   _playersReady: HTMLMediaElement[] = [];
 
-  private isPlayerReady(player: HTMLMediaElement) {
-    return this._playersReady.includes(player);
-  }
+  // private isPlayerReady(player: HTMLMediaElement) {
+  //   return this._playersReady.includes(player);
+  // }
 
   _playersEventsCounter: Map<HTMLMediaElement, Record<string, number>> = new Map();
 
@@ -129,7 +135,9 @@ export class TimedTextPlayer extends LitElement {
           },
           metadata: {
             element: s,
-            selector: finder(s, {root: s.parentElement}),
+            selector: finder(s, {root: s.parentElement as HTMLElement}),
+            playerTemplateSelector: s.getAttribute('data-player'),
+            data: s.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: s.getAttribute(n)}), {}),
           },
           children: Array.from(s.children).map((c): Clip | Gap => {
             const [start, end] = (c.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
@@ -147,7 +155,8 @@ export class TimedTextPlayer extends LitElement {
               metadata: {
                 element: c,
                 transcript: c.textContent,
-                selector: finder(c, {root: s.parentElement}),
+                selector: finder(c, {root: s.parentElement as HTMLElement}),
+                data: c.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: c.getAttribute(n)}), {}),
               },
               timed_texts: Array.from(c.children).map((t) => {
                 const [start, end] = (t.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
@@ -161,7 +170,7 @@ export class TimedTextPlayer extends LitElement {
                   style_ids: [],
                   metadata: {
                     element: t,
-                    selector: finder(t, {root: s.parentElement}),
+                    selector: finder(t, {root: s.parentElement as HTMLElement}),
                   },
                 } as unknown as TimedText;
               }),
@@ -221,24 +230,42 @@ export class TimedTextPlayer extends LitElement {
   @property({type: String, attribute: 'player'})
   playerTemplateSelector = '';
 
+  @property({type: String})
+  width = 'auto';
+
+  @property({type: String})
+  height = 'auto';
+
   override render() {
-    return html`
+    let overlay;
+    if (this._clip && (this._clip as Clip).metadata.data.effect) {
+      const clip = this._clip as Clip;
+      const template = document.createElement('template');
+      template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.data.effect)?.innerHTML ?? '').trim(), { src: clip.media_reference.target, ...clip.metadata?.data });
+      overlay = template.content.childNodes as NodeListOf<HTMLElement>;
+
+    }
+
+    console.log({overlay, clip: this._clip});
+
+    return html`<div style="width: ${this.width}; height: ${this.height}">
       ${this.track ? this.track.children.map((clip, i, arr) => {
         const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
         const duration = clip.source_range.duration;
 
         const template = document.createElement('template');
-        template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(this.playerTemplateSelector)?.innerHTML ?? '').trim(), { src: clip.media_reference.target });
+        template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector)?.innerHTML ?? '').trim(), { src: clip.media_reference.target, ...clip.metadata?.data });
         const node = template.content.childNodes[0] as HTMLElement;
         const tag = node.nodeName.toLowerCase();
         const attrs = Array.from(node.attributes).map((attr) => `${(attr.name)}=${attr.value !== '' ? attr.value : '""' }`);
+        const siblings = Array.from(template.content.childNodes).slice(1);
+
         // console.log({a: Array.from(node.attributes), attrs})
 
-        // TODO add node children
-        return html`<${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
+        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'}><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
             data-offset=${offset}
-            class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
+            _class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
 
             @timeupdate=${this._onTimeUpdate}
             @canplay=${this._onCanPlay}
@@ -262,8 +289,10 @@ export class TimedTextPlayer extends LitElement {
             @waiting=${this._relayEvent}
             @error=${this._relayEvent}
             @volumechange=${this._relayEvent}
-          ></${unsafeStatic(tag)}>`;
+          >${node.children}</${unsafeStatic(tag)}>${siblings}</div>`;
       }) : null}
+      ${overlay}
+      </div>
       <div style="height: 40px"></div>
       <!-- <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot> -->
     `;
@@ -360,7 +389,7 @@ export class TimedTextPlayer extends LitElement {
 
     console.log({sectionIndex, offset});
 
-    const [start, end] = (element.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const [start] = (element.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
     const time = start - section.source_range.start_time + offset;
 
     console.log(time)
@@ -426,6 +455,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   _section = null;
+  @state()
   _clip = null;
   _timedText = null;
   private _dispatchTimedTextEvent() {
@@ -439,10 +469,10 @@ export class TimedTextPlayer extends LitElement {
     //   this.dispatchEvent(new CustomEvent('playhead', {detail: {section, offset}}));
     //   this._section = section;
     // }
-    // if (this._clip !== clip) {
-    //   this.dispatchEvent(new CustomEvent('playhead', {detail: {clip, section, offset}}));
-    //   this._clip = clip;
-    // }
+    if (this._clip !== clip) {
+      // this.dispatchEvent(new CustomEvent('playhead', {detail: {clip, section, offset}}));
+      this._clip = clip;
+    }
     if (this._timedText !== timedText) {
       this.dispatchEvent(new CustomEvent('playhead', {detail: {timedText, clip, section, offset}}));
       this._timedText = timedText;
