@@ -21,6 +21,7 @@ export interface TimeRange {
 export interface Clip {
   OTIO_SCHEMA: string;
   markers: any[]; // Replace 'any' with a more specific type if markers have a defined structure
+  effects: Effect[];
   media_reference: any | null; // Replace 'any' with a specific type if media references have a defined structure
   metadata: Metadata;
   name: string;
@@ -47,6 +48,7 @@ export interface Track {
   metadata: Metadata;
   name: string;
   // source_range: TimeRange | null;
+  effects: Effect[];
 }
 
 export interface TimedText {
@@ -57,4 +59,11 @@ export interface TimedText {
   marked_range: TimeRange;
   texts: string | string[];
   style_ids: string[];
+}
+
+export interface Effect {
+  OTIO_SCHEMA: string;
+  name: string;
+  metadata: Metadata;
+  source_range: TimeRange; // TODO: verify with OTIO spec
 }

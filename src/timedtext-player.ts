@@ -6,7 +6,7 @@ import {customElement, state, property, queryAll} from 'lit/decorators.js';
 import {finder} from '@medv/finder';
 
 import {interpolate} from './utils';
-import {Clip, Gap, TimedText, Track} from './interfaces';
+import {Clip, Gap, TimedText, Track, Effect} from './interfaces';
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
@@ -112,6 +112,7 @@ export class TimedTextPlayer extends LitElement {
     });
   }
 
+  // const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
   private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
     if (!sections) return;
 
@@ -123,8 +124,11 @@ export class TimedTextPlayer extends LitElement {
         const src = s.getAttribute('data-media-src');
         const [start, end] = (s.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
 
+        const children: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('p[data-t]:not(*[data-effect]), div[data-t]:not(*[data-effect])');
+        const effects: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('div[data-t][data-effect]');
+
         return {
-          OTIO_SCHEMA: 'Clip.1',
+          OTIO_SCHEMA: 'Clip.1', // TODO: verify with OTIO spec, should be Composable?
           source_range: {
             start_time: start,
             duration: end - start
@@ -139,7 +143,7 @@ export class TimedTextPlayer extends LitElement {
             playerTemplateSelector: s.getAttribute('data-player'),
             data: s.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: s.getAttribute(n)}), {}),
           },
-          children: Array.from(s.children).map((c): Clip | Gap => {
+          children: Array.from(children).map((c): Clip | Gap => {
             const [start, end] = (c.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
 
             return {
@@ -174,6 +178,7 @@ export class TimedTextPlayer extends LitElement {
                   },
                 } as unknown as TimedText;
               }),
+              effects: [],
             } as unknown as Clip;
           }).reduce((acc, c, i, arr) => {
             if (i === 0 || i === arr.length - 1) return [...acc, c];
@@ -192,10 +197,25 @@ export class TimedTextPlayer extends LitElement {
             } as unknown as Gap;
             return [...acc, gap, c];
           }, [] as Clip[] | Gap[]),
+          effects: Array.from(effects).map((effect): Effect => {
+            return {
+              name: effect.getAttribute('data-effect') ?? '',
+              metadata: {
+                element: effect,
+                selector: finder(effect, {root: s.parentElement as HTMLElement}),
+                data: effect.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: effect.getAttribute(n)}), {}),
+              },
+              source_range: {
+                start_time: parseFloat(effect.getAttribute('data-t')?.split(',')[0] ?? '0'),
+                duration: parseFloat(effect.getAttribute('data-t')?.split(',')[1] ?? '0') - parseFloat(effect.getAttribute('data-t')?.split(',')[0] ?? '0'),
+              }
+            } as unknown as Effect;
+          })
         } as unknown as Clip;
       }),
       markers: [],
       metadata: {},
+      effects: [],
     } as Track;
 
     console.log({track: this.track});
@@ -238,15 +258,15 @@ export class TimedTextPlayer extends LitElement {
 
   override render() {
     let overlay;
-    if (this._clip && (this._clip as Clip).metadata.data.effect) {
-      const clip = this._clip as Clip;
-      const template = document.createElement('template');
-      template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.data.effect)?.innerHTML ?? '').trim(), { src: clip.media_reference.target, ...clip.metadata?.data });
-      overlay = template.content.childNodes as NodeListOf<HTMLElement>;
+    // if (this._clip && (this._clip as Clip).metadata.data.effect) {
+    //   const clip = this._clip as Clip;
+    //   const template = document.createElement('template');
+    //   template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.data.effect)?.innerHTML ?? '').trim(), { src: clip.media_reference.target, ...clip.metadata?.data });
+    //   overlay = template.content.childNodes as NodeListOf<HTMLElement>;
 
-    }
+    // }
+    // console.log({overlay, clip: this._clip});
 
-    console.log({overlay, clip: this._clip});
 
     return html`<div style="width: ${this.width}; height: ${this.height}">
       ${this.track ? this.track.children.map((clip, i, arr) => {
@@ -260,7 +280,21 @@ export class TimedTextPlayer extends LitElement {
         const attrs = Array.from(node.attributes).map((attr) => `${(attr.name)}=${attr.value !== '' ? attr.value : '""' }`);
         const siblings = Array.from(template.content.childNodes).slice(1);
 
-        // console.log({a: Array.from(node.attributes), attrs})
+        const overlays = clip.effects.flatMap((effect) => {
+          const start = effect.source_range.start_time - clip.source_range.start_time + offset;
+          const end = start + effect.source_range.duration;
+          console.log({start, end, time: this.time});
+          if (start <= this.time && this.time < end) {
+            const progress = (this.time - start) / effect.source_range.duration;
+            const template = document.createElement('template');
+            template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? '').trim(), {progress, ...effect.metadata?.data});
+            return template.content.childNodes as NodeListOf<HTMLElement>;
+          }
+          return null;
+        });
+
+        // if (overlays?.length ?? 0 > 0)
+        console.log({overlays});
 
         return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'}><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
@@ -289,7 +323,11 @@ export class TimedTextPlayer extends LitElement {
             @waiting=${this._relayEvent}
             @error=${this._relayEvent}
             @volumechange=${this._relayEvent}
-          >${node.children}</${unsafeStatic(tag)}>${siblings}</div>`;
+          >${node.children}</${unsafeStatic(tag)}>
+            ${siblings}
+            <!-- overlays -->
+            ${overlays}
+          </div>`;
       }) : null}
       ${overlay}
       </div>
