@@ -8,12 +8,15 @@
     "onwarn",
     "OTIO",
     "Parens",
+    "pilcrow",
+    "punct",
     "saucelabs",
     "Slotchange",
     "theirstory",
     "timedtext",
     "vals",
     "webcomponents",
-    "webcomponentsjs"
+    "webcomponentsjs",
+    "WEBVTT"
   ]
 }
