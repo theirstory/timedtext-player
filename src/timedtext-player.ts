@@ -35,7 +35,7 @@ class TextTrack {
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
-  static override styles = css`
+  static override styles = document.location.href.indexOf('debug') > 0 ? css`
     :host {
       display: block;
     }
@@ -51,6 +51,29 @@ export class TimedTextPlayer extends LitElement {
       display: inline-block;
       /* display: none; */
       color: white;
+    }
+    video {
+      width: 320px;
+    }
+  ` : css`
+  :host {
+      display: block;
+    }
+    .active {
+      /* outline: 4px solid red; */
+      display: block !important;
+    }
+    *[data-t] {
+      /* margin: 10px; */
+    }
+    .wrapper {
+      position: relative;
+      /* display: inline-block; */
+      display: none;
+      color: white;
+    }
+    video {
+      width: 320px;
     }
   `;
 
@@ -182,7 +205,7 @@ export class TimedTextPlayer extends LitElement {
           },
           children: Array.from(children).map((c): Clip | Gap => {
             const [start, end] = (c.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-            const children: NodeListOf<HTMLElement> | undefined = c.querySelectorAll('*[data-t]');
+            const children: NodeListOf<HTMLElement> | undefined = c.querySelectorAll('*[data-t],*[data-m]');
             const segmenter = new (Intl as any).Segmenter('en', { granularity: 'sentence' }); // TODO language detection? from page?
             // const text = c.textContent ?? ''; // TBD this has a lot of whitespace and might have non timed text?
             const text = Array.from(children).map((t) => t.textContent).join(' '); // TBD this is the timed text only
@@ -207,7 +230,16 @@ export class TimedTextPlayer extends LitElement {
                 sentences,
               },
               timed_texts: Array.from(children).map((t, i, arr) => {
-                const [start, end] = (t.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+                let start, end;
+                if (t.getAttribute('data-t')) {
+                  const f = (t.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+                  start = f[0];
+                  end = f[1];
+                } else {
+                  start = parseFloat(t.getAttribute('data-m') ?? '') / 1e3;
+                  end = start + parseFloat(t.getAttribute('data-d') ?? '') / 1e3;
+                }
+
                 const prefix = arr.slice(0, i).map((t) => t.textContent ?? '').join(' ') + (i > 0 ? ' ' : '');
                 const textOffset = prefix.length;
                 const text = (t.textContent ?? '');
@@ -407,7 +439,7 @@ export class TimedTextPlayer extends LitElement {
     // console.log({overlay, clip: this._clip});
 
 
-    return html`<div style="width: ${this.width ?? 'auto'}; height: ${this.height ?? 'auto'}">
+    return html`<div>
       ${this.track ? this.track.children.map((clip, i, arr) => {
         const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
         const duration = clip.source_range.duration;
@@ -439,7 +471,7 @@ export class TimedTextPlayer extends LitElement {
         // if (overlays?.length ?? 0 > 0)
         // console.log({overlays});
 
-        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'}><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
+        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="width: ${this.width ?? 'auto'} px; height: ${this.height ?? 'auto'} px"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
             data-offset=${offset}
             _class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
@@ -586,7 +618,14 @@ export class TimedTextPlayer extends LitElement {
 
     console.log({sectionIndex, offset});
 
-    const [start] = (element.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    let start;
+    if (element.getAttribute('data-t')) {
+      const f = (element.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+      start = f[0];
+    } else {
+      start = parseFloat(element.getAttribute('data-m') ?? '') / 1e3;
+    }
+
     const time = start - section.source_range.start_time + offset;
 
     console.log(time)
