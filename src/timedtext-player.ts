@@ -256,6 +256,7 @@ export class TimedTextPlayer extends LitElement {
                 const sentence = Array.from(sentences).reverse().find(({index}) => textOffset >= index);
                 const sos = sentence?.index === textOffset;
                 const eos = sentence?.index + sentence?.text.trim().length === textOffset + text.length;
+                const punct = !!text.trim().charAt(text.length - 1).match(/\p{P}/gu);
 
                 return {
                   OTIO_SCHEMA: 'TimedText.1',
@@ -269,69 +270,99 @@ export class TimedTextPlayer extends LitElement {
                     element: t,
                     selector: finder(t, {root: s.parentElement as HTMLElement}),
                     textOffset,
-                    sentence,
                     sos,
                     eos,
                     length: text.length,
-                    punct: !!text.trim().charAt(text.length - 1).match(/\p{P}/gu), // TBD detect more punctuation
-                    ruby: `<ruby>${t.textContent}<rt>${eos ? 'eos' : ''} ${sos ? 'sos' : ''} ${!!text.trim().charAt(text.length - 1).match(/\p{P}/gu) ? 'punct' : ''}</rt></ruby>`
+                    punct,
                   },
                 } as unknown as TimedText;
               }),
               effects: [],
             } as unknown as Clip;
-          }).map((block) => {
-            const items = (block as Clip).timed_texts ?? [];
-            const lastItem = items[items.length - 1];
-            let lastBreak = 0;
+          }) //
+          .map((p) => {
+            const tt = (p as Clip).timed_texts ?? [];
 
-            items[0].metadata.lastBreak = lastBreak;
-            items[0].metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
-
-            while (lastBreak < lastItem.metadata.textOffset + lastItem.metadata.length) {
-              const i = items.findIndex(({metadata: { textOffset: offset, length }}) => offset + length - lastBreak >= 37 * 2);
-              if (i === -1) break;
-
-              // find candidates under the total char length
-              const candidates = items.slice(i - 5 < 0 ? 0 : i - 5, i);
-
-              // select the last eos or last punctuation or last candidate (note the array was reversed)
-              let item =
-                candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
-
-              // avoid widows
-              // if (i < items.length - 5) {
-              //   // look ahead 2 items for punctuation
-              //   item = items.slice(i, i + 2).find(({metadata: { punct }}) => punct) ?? item;
-              // } else if (i >= items.length - 5) {
-              //   // we have few items left, use first candidates (eos, punct or first)
-              //   item = candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
-              // }
-
-              item.metadata.pilcrow = true;
-              item.metadata.lastBreak = lastBreak;
-              item.metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
-
-              lastBreak = item.metadata.textOffset + item.metadata.length + 1;
-            }
-
-            lastItem.metadata.pilcrow = true;
-            lastItem.metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
-
-            lastItem.metadata.ruby = `<ruby>${lastItem.texts}<rt>${lastItem.metadata.captionGroup}</rt></ruby>`;
-
-            // spread lastBreak to all items
-            items.forEach((item, i, arr) => {
-              if (item.metadata.captionGroup) {
-                // item.metadata.ruby = `<ruby>${item.texts}<rt>${item.metadata.captionGroup}</rt></ruby>`;
-                return;
-              }
-              item.metadata.captionGroup = arr[i - 1].metadata.captionGroup;
-              // item.metadata.ruby = `<ruby>${item.texts}<rt>${item.metadata.captionGroup}</rt></ruby>`;
+            tt.forEach((t, i, arr) => {
+              if (i === 0) return;
+              const prev = arr[i - 1];
+              if (t.metadata.sos) prev.metadata.eos = true;
             });
 
-            return block;
-          }).reduce((acc, c, i, arr) => {
+            tt.forEach((t, i, arr) => {
+              if (i === 0) {
+                t.metadata.lastBreak = 0;
+                t.metadata.captionGroup = `c${p.source_range.start_time}-${t.metadata.lastBreak}`;
+                return;
+              }
+
+              t.metadata.lastBreak = arr[i - 1].metadata.lastBreak;
+              t.metadata.captionGroup = `c${p.source_range.start_time}-${t.metadata.lastBreak}`;
+
+              if (t.metadata.textOffset + t.metadata.length - t.metadata.lastBreak >= 37 * 2) {
+                t.metadata.lastBreak = t.metadata.textOffset + t.metadata.length + 1;
+                t.metadata.pilcrow = true;
+              }
+            });
+
+            return p;
+          })
+          // .map((block) => {
+          //   const items = (block as Clip).timed_texts ?? [];
+          //   const lastItem = items[items.length - 1];
+          //   let lastBreak = 0;
+
+          //   items[0].metadata.lastBreak = lastBreak;
+          //   items[0].metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
+
+          //   while (lastBreak < lastItem.metadata.textOffset + lastItem.metadata.length) {
+          //     const i = items.findIndex(({metadata: { textOffset: offset, length }}) => offset + length - lastBreak >= 37 * 2);
+          //     if (i === -1) break;
+
+          //     // find candidates under the total char length
+          //     const candidates = items.slice(i - 5 < 0 ? 0 : i - 5, i);
+
+          //     // select the last eos or last punctuation or last candidate (note the array was reversed)
+          //     let item =
+          //       candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
+
+          //     // avoid widows
+          //     // if (i < items.length - 5) {
+          //     //   // look ahead 2 items for punctuation
+          //     //   item = items.slice(i, i + 2).find(({metadata: { punct }}) => punct) ?? item;
+          //     // } else if (i >= items.length - 5) {
+          //     //   // we have few items left, use first candidates (eos, punct or first)
+          //     //   item = candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
+          //     // }
+
+          //     item.metadata.pilcrow = true;
+          //     item.metadata.lastBreak = lastBreak + 0;
+          //     console.log({lastBreak, i: item.metadata.lastBreak});
+          //     item.metadata.captionGroup = `c${items[0].marked_range.start_time}-${item.metadata.lastBreak}`;
+          //     console.log({lastBreak, i: item.metadata.lastBreak, g: item.metadata.captionGroup, item});
+          //     lastBreak = item.metadata.textOffset + item.metadata.length + 1;
+          //     console.log({lastBreak, i: item.metadata.lastBreak, g: item.metadata.captionGroup});
+          //     // console.log({lastBreak, offset: item.metadata.textOffset, length: item.metadata.length});
+          //   }
+
+          //   lastItem.metadata.pilcrow = true;
+          //   lastItem.metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
+
+          //   // lastItem.metadata.ruby = `<ruby>${lastItem.texts}<rt>${lastItem.metadata.captionGroup}</rt></ruby>`;
+
+          //   // spread lastBreak to all items
+          //   items.forEach((item, i, arr) => {
+          //     if (i === 0) return;
+          //     if (item.metadata.captionGroup) return;
+
+          //     item.metadata.captionGroup = arr[i - 1].metadata.captionGroup;
+          //   });
+
+          //   console.log({items});
+
+          //   return block;
+          // }) //
+          .reduce((acc, c, i, arr) => {
             if (i === 0 || i === arr.length - 1) return [...acc, c];
             const prev = arr[i - 1];
             if (c.source_range.start_time === prev.source_range.start_time + prev.source_range.duration) return [...acc, c];
@@ -384,7 +415,6 @@ export class TimedTextPlayer extends LitElement {
   private getCaptions(segment: Clip): string {
     const clips = segment.children;
     const timedTexts = clips.flatMap((c) => c.timed_texts ?? []);
-    // const captions = groupBy(timedTexts, (t) => t.metadata.captionGroup);
     const grouped = timedTexts.reduce((acc, obj) => {
       // Initialize the sub-array for the group if it doesn't exist
       if (!acc[obj.metadata.captionGroup]) {
@@ -410,17 +440,14 @@ export class TimedTextPlayer extends LitElement {
     (captions as any).forEach((tt: TimedText[], i: number) => {
       const first = tt[0];
       const last = tt[tt.length - 1];
-      const text = tt.map((t) => t.metadata.ruby + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + `<${formatSeconds(t.marked_range.start_time)}>`).join(' ');
-      // const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')).join(' ');
-      console.log({tt, first, last, text});
-
-      const id = `${i}`; // : ${first.marked_range.start_time} - ${last.marked_range.start_time} + ${last.marked_range.duration} = ${last.marked_range.start_time + last.marked_range.duration}`;
+      // const text = tt.map((t) => t.metadata.ruby + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + `<${formatSeconds(t.marked_range.start_time)}>`).join(' ');
+      const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')).join(' ');
+      const id = `${i}`;
 
       vttOut += `${id}\n${formatSeconds(first.marked_range.start_time)} --> ${formatSeconds(last.marked_range.start_time + last.marked_range.duration)}\n${text}\n\n`;
     });
 
     return vttOut;
-    // return URL.createObjectURL(new Blob([vttOut], { type: "text/vtt" }));
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
