@@ -53,8 +53,18 @@ export class TimedTextPlayer extends LitElement {
       color: white;
     }
     video {
-      width: 320px;
+      width: 640px;
     }
+    video::cue(.yellow) {
+      color: yellow;
+    }
+    ::cue:past {
+      color: white;
+    }
+    ::cue:future {
+      color: grey;
+    }
+
   ` : css`
   :host {
       display: block;
@@ -264,6 +274,7 @@ export class TimedTextPlayer extends LitElement {
                     eos,
                     length: text.length,
                     punct: !!text.trim().charAt(text.length - 1).match(/\p{P}/gu), // TBD detect more punctuation
+                    ruby: `<ruby>${t.textContent}<rt>${eos ? 'eos' : ''} ${sos ? 'sos' : ''} ${!!text.trim().charAt(text.length - 1).match(/\p{P}/gu) ? 'punct' : ''}</rt></ruby>`
                   },
                 } as unknown as TimedText;
               }),
@@ -275,8 +286,9 @@ export class TimedTextPlayer extends LitElement {
             let lastBreak = 0;
 
             items[0].metadata.lastBreak = lastBreak;
+            items[0].metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
 
-            while (lastBreak < lastItem.metadata.textOffset + lastItem.texts.length) {
+            while (lastBreak < lastItem.metadata.textOffset + lastItem.metadata.length) {
               const i = items.findIndex(({metadata: { textOffset: offset, length }}) => offset + length - lastBreak >= 37 * 2);
               if (i === -1) break;
 
@@ -288,30 +300,34 @@ export class TimedTextPlayer extends LitElement {
                 candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
 
               // avoid widows
-              if (i < items.length - 5) {
-                // look ahead 2 items for punctuation
-                item = items.slice(i, i + 2).find(({metadata: { punct }}) => punct) ?? item;
-              } else if (i >= items.length - 5) {
-                // we have few items left, use first candidates (eos, punct or first)
-                item = candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
-              }
+              // if (i < items.length - 5) {
+              //   // look ahead 2 items for punctuation
+              //   item = items.slice(i, i + 2).find(({metadata: { punct }}) => punct) ?? item;
+              // } else if (i >= items.length - 5) {
+              //   // we have few items left, use first candidates (eos, punct or first)
+              //   item = candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? candidates[0];
+              // }
 
               item.metadata.pilcrow = true;
               item.metadata.lastBreak = lastBreak;
+              item.metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
+
               lastBreak = item.metadata.textOffset + item.metadata.length + 1;
-              // console.log('pilcrow', {item});
             }
 
             lastItem.metadata.pilcrow = true;
+            lastItem.metadata.captionGroup = `c${items[0].marked_range.start_time}-${lastBreak}`;
+
+            lastItem.metadata.ruby = `<ruby>${lastItem.texts}<rt>${lastItem.metadata.captionGroup}</rt></ruby>`;
 
             // spread lastBreak to all items
             items.forEach((item, i, arr) => {
-              if (item.metadata.lastBreak !== undefined) {
-                item.metadata.captionGroup = `c${item.metadata.lastBreak}`;
+              if (item.metadata.captionGroup) {
+                // item.metadata.ruby = `<ruby>${item.texts}<rt>${item.metadata.captionGroup}</rt></ruby>`;
                 return;
               }
-              item.metadata.lastBreak = arr[i - 1].metadata.lastBreak;
-              item.metadata.captionGroup = `c${item.metadata.lastBreak}`;
+              item.metadata.captionGroup = arr[i - 1].metadata.captionGroup;
+              // item.metadata.ruby = `<ruby>${item.texts}<rt>${item.metadata.captionGroup}</rt></ruby>`;
             });
 
             return block;
@@ -384,16 +400,23 @@ export class TimedTextPlayer extends LitElement {
 
     const formatSeconds = (seconds: number): string => new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23);
 
-    let vttOut = 'WEBVTT\n\n';
-    (captions as any).forEach((tt: TimedText[]) => {
+    let vttOut = ['WEBVTT',
+    '',
+    'Kind: captions',
+    'Language: en-US', // TODO lift language from transcript?
+    '',
+    // 'REGION id=LT width=90% lines=2 regionanchor=0%,100% viewportanchor=10%,90% scroll=none',
+    '', '', ''].join('\n');
+    (captions as any).forEach((tt: TimedText[], i: number) => {
       const first = tt[0];
       const last = tt[tt.length - 1];
-      const text = tt.map((t) => t.texts).join(' ');
-      const color = 'white';
+      const text = tt.map((t) => t.metadata.ruby + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + `<${formatSeconds(t.marked_range.start_time)}>`).join(' ');
+      // const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')).join(' ');
+      console.log({tt, first, last, text});
 
-      console.log({first, last, text});
+      const id = `${i}`; // : ${first.marked_range.start_time} - ${last.marked_range.start_time} + ${last.marked_range.duration} = ${last.marked_range.start_time + last.marked_range.duration}`;
 
-      vttOut += `${color}\n${formatSeconds(first.marked_range.start_time)} --> ${formatSeconds(last.marked_range.start_time + last.marked_range.duration)}\n${text}\n\n`;
+      vttOut += `${id}\n${formatSeconds(first.marked_range.start_time)} --> ${formatSeconds(last.marked_range.start_time + last.marked_range.duration)}\n${text}\n\n`;
     });
 
     return vttOut;
