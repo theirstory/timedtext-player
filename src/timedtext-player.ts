@@ -391,7 +391,7 @@ export class TimedTextPlayer extends LitElement {
     const captions = Object.values(grouped);
     console.log({captions});
 
-    const captions2 = captions.reduce((acc, g, i, arr) => {
+    const captions2 = captions.reduce((acc, g) => {
       const p = g.findIndex(t => t.metadata.pilcrow);
       const p0 = g.findIndex(t => t.metadata.pilcrow0);
 
@@ -406,7 +406,7 @@ export class TimedTextPlayer extends LitElement {
       return [...acc, g];
     }, [] as TimedText[][]);
 
-    const captions3 = captions2.reduce((acc, g, i, arr) => {
+    const captions3 = captions2.reduce((acc, g, i) => {
       if (i === 0) return [...acc, g];
       const prev = acc.pop();
 
@@ -416,7 +416,7 @@ export class TimedTextPlayer extends LitElement {
 
       // default
       return [...acc, prev, g];
-    }, [] as TimedText[][]);
+    }, [] as (TimedText[] | undefined)[]);
 
     console.log({captions2, captions3});
 
