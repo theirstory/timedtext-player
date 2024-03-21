@@ -10,28 +10,28 @@ import {interpolate} from './utils';
 import {Clip, Gap, TimedText, Track, Effect} from './interfaces';
 
 
-class TextTrack {
-  constructor(players: NodeListOf<HTMLMediaElement>) {
-    this._players = players;
-  }
+// class TextTrack {
+//   constructor(players: NodeListOf<HTMLMediaElement>) {
+//     this._players = players;
+//   }
 
-  _players: NodeListOf<HTMLMediaElement>;
+//   _players: NodeListOf<HTMLMediaElement>;
 
-  _mode = 'showing' as TextTrackMode;
+//   _mode = 'showing' as TextTrackMode;
 
-  get mode(): TextTrackMode {
-    return this._mode;
-  }
+//   get mode(): TextTrackMode {
+//     return this._mode;
+//   }
 
-  set mode(mode: TextTrackMode) {
-    console.log(`setting mode to ${mode}`, this._players);
-    this._mode = mode;
-    this._players.forEach((p) => {
-      const track = p.textTracks[0];
-      if (track) track.mode = mode;
-    });
-  }
-}
+//   set mode(mode: TextTrackMode) {
+//     console.log(`setting mode to ${mode}`, this._players);
+//     this._mode = mode;
+//     this._players.forEach((p) => {
+//       const track = p.textTracks[0];
+//       if (track) track.mode = mode;
+//     });
+//   }
+// }
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
@@ -171,7 +171,7 @@ export class TimedTextPlayer extends LitElement {
   // }
 
 
-  textTracks: TextTrack[] = [];
+  // textTracks: TextTrack[] = [];
 
   _playersEventsCounter: Map<HTMLMediaElement, Record<string, number>> = new Map();
 
@@ -372,7 +372,7 @@ export class TimedTextPlayer extends LitElement {
 
 
     this._duration = this.track.children.reduce((acc, c) => acc + c.source_range.duration, 0);
-    this.textTracks = [new TextTrack(this._players)]
+    // this.textTracks = [new TextTrack(this._players)]
   }
 
   private getCaptions(segment: Clip): string {
