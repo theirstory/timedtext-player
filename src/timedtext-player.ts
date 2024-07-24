@@ -53,7 +53,11 @@ export class TimedTextPlayer extends LitElement {
       color: white;
     }
     video {
-      width: 640px;
+      /* width: 640px; */
+    }
+    video::cue {
+      /* margin-bottom: 40px !important; */
+      color: green !important;
     }
     video::cue(.yellow) {
       color: yellow;
@@ -82,7 +86,11 @@ export class TimedTextPlayer extends LitElement {
       color: white;
     }
     video {
-      width: 320px;
+      /* width: 320px; */
+    }
+    video::cue {
+      /* padding-bottom: 40px !important; */
+      /* color: red !important; */
     }
   `;
 
@@ -97,6 +105,7 @@ export class TimedTextPlayer extends LitElement {
   time = 0;
 
   set currentTime(time: number) {
+    console.log({setCurrentTime: time});
     this._seek(time);
     // cancel end
     this._end = this._duration;
@@ -104,6 +113,10 @@ export class TimedTextPlayer extends LitElement {
 
   get currentTime() {
     return this.time;
+  }
+
+  set currentPseudoTime(time: number) {
+    this._dispatchTimedTextEvent(time);
   }
 
   get seeking() {
@@ -273,7 +286,8 @@ export class TimedTextPlayer extends LitElement {
                     eos,
                     length: text.length,
                     punct,
-                    ruby: `<ruby>${text}<rt>${eos ? 'eos ' : ''}${sos ? 'sos ' : ''}${punct ? 'punct ' : ''}</rt></ruby>`,
+                    // ruby: `<ruby>${text}<rt>${eos ? 'eos ' : ''}${sos ? 'sos ' : ''}${punct ? 'punct ' : ''}</rt></ruby>`,
+                    ruby: `<ruby>${text}</ruby>`, // FIXME
                   },
                 } as unknown as TimedText;
               }),
@@ -410,7 +424,7 @@ export class TimedTextPlayer extends LitElement {
       if (i === 0) return [...acc, g];
       const prev = acc.pop();
 
-      if (prev && prev[prev.length - 1].metadata.glue) {
+      if (prev && prev[prev.length - 1]?.metadata?.glue) {
         return [...acc, [...prev, ...g]];
       }
 
@@ -420,7 +434,7 @@ export class TimedTextPlayer extends LitElement {
 
     console.log({captions2, captions3});
 
-    const formatSeconds = (seconds: number): string => new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23);
+    const formatSeconds = (seconds: number): string => seconds ? new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23) : '00:00:00:000';
 
     let vttOut = ['WEBVTT',
     '',
@@ -428,33 +442,53 @@ export class TimedTextPlayer extends LitElement {
     'Language: en-US', // TODO lift language from transcript?
     '',
     ''].join('\n');
+
     (captions3 as any).forEach((tt: TimedText[], i: number) => {
       const first = tt[0];
       const last = tt[tt.length - 1];
+      // let text = tt.map(t => t.texts)
       const text = tt.map((t) => t.metadata.ruby
-        + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')
-        + (t.metadata.pilcrow0 ? '<c.yellow>◊ </c>' : '')
-        + (t.metadata.pilcrow2 ? '<c.yellow>†</c>' : '')
-        + (t.metadata.pilcrow3 ? '<c.yellow>‡</c>' : '')
-        + (t.metadata.pilcrow4 ? '<c.yellow>⌑ </c>' : '')
+        // + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')
+        // + (t.metadata.pilcrow0 ? '<c.yellow>◊</c>' : '')
+        // + (t.metadata.pilcrow2 ? '<c.yellow>†</c>' : '')
+        // + (t.metadata.pilcrow3 ? '<c.yellow>‡</c>' : '')
+        // + (t.metadata.pilcrow4 ? '<c.yellow>⌑</c>' : '')
         + `<${formatSeconds(t.marked_range.start_time)}>`).join(' ');
       // const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + (t.metadata.pilcrow2 ? '<c.yellow>*</c>' : '')).join(' ');
       const id = `${i}`;
-      vttOut += `${id}\n${formatSeconds(first.marked_range.start_time)} --> ${formatSeconds(last.marked_range.start_time + last.marked_range.duration)}\n${text}\n\n`;
+      vttOut += `${id}\n${formatSeconds(first?.marked_range?.start_time)} --> ${formatSeconds(last?.marked_range?.start_time + last?.marked_range?.duration)}\n${text}\n\n`;
     });
 
     return vttOut;
   }
 
+  @property({type: String, attribute: 'pause-mutation-observer'})
+  pauseMutationObserver = "false";
+
+  public parseTranscript() {
+    const article = document.querySelector(this.transcriptTemplateSelector) as HTMLElement;
+
+    console.log({article});
+
+    if (!article) return;
+    const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
+    console.log({sections});
+    this._dom2otio(sections);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private callback(mutationList: any, _observer: MutationObserver) {
+    if (this.pauseMutationObserver === "true") return; // FIXME property should be boolean but in react I get string
+
     let article;
     for (const mutation of mutationList) {
+      article = mutation.target.closest('article');
       if (mutation.type === "childList") {
         console.log("A child node has been added or removed.");
-        article = mutation.target;
+        // article = mutation.target;
       } else if (mutation.type === "attributes") {
         console.log(`The ${mutation.attributeName} attribute was modified.`);
+        // article = mutation.target.closest('article')
       }
     }
 
@@ -462,6 +496,7 @@ export class TimedTextPlayer extends LitElement {
     if (!article) return;
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
     console.log({sections});
+    if (!sections || sections.length === 0) return;
     this._dom2otio(sections);
   }
 
@@ -472,6 +507,10 @@ export class TimedTextPlayer extends LitElement {
 
   @property({type: String, attribute: 'player'})
   playerTemplateSelector = '';
+
+
+  @property({type: String, attribute: 'transcript'})
+  transcriptTemplateSelector = 'article'; // TODO article has section data-t?
 
   override render() {
     let overlay;
@@ -485,8 +524,8 @@ export class TimedTextPlayer extends LitElement {
     // console.log({overlay, clip: this._clip});
 
 
-    return html`<div>
-      ${this.track ? this.track.children.map((clip, i, arr) => {
+    return html`<div style="width: 100%; height: 100%">
+      ${this.track && this.track.children.length > 0 ? this.track.children.map((clip, i, arr) => {
         const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
         const duration = clip.source_range.duration;
 
@@ -494,7 +533,9 @@ export class TimedTextPlayer extends LitElement {
         template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector)?.innerHTML ?? '').trim(), {
           src: clip.media_reference.target,
           captions: clip.metadata.captionsUrl,
-          ...clip.metadata?.data
+          ...clip.metadata?.data,
+          width: this.width ?? 'auto',
+          height: this.height ?? 'auto',
         });
         const node = template.content.childNodes[0] as HTMLElement;
         const tag = node.nodeName.toLowerCase();
@@ -517,10 +558,11 @@ export class TimedTextPlayer extends LitElement {
         // if (overlays?.length ?? 0 > 0)
         // console.log({overlays});
 
-        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="width: ${this.width ?? 'auto'} px; height: ${this.height ?? 'auto'} px"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
+        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="width: 100%; height: 100%"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
             data-offset=${offset}
             _class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
+            style="width: 100%; height: 100%"
 
             @timeupdate=${this._onTimeUpdate}
             @canplay=${this._onCanPlay}
@@ -552,10 +594,10 @@ export class TimedTextPlayer extends LitElement {
             <!-- overlays -->
             ${overlays}
           </div>`;
-      }) : null}
+      }) : html`<video style="width: 100%; height: 100%" poster="https://placehold.co/620x400?text=no+signal"></video>`}
       ${overlay}
       </div>
-      <div style="height: 40px"></div>
+      <!-- <div style="height: 40px"></div> -->
       <!-- <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot> -->
     `;
   }
@@ -630,7 +672,9 @@ export class TimedTextPlayer extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
-    const article = document.getElementById('transcript');
+    // const article = document.getElementById('transcript');
+    const article = document.querySelector(this.transcriptTemplateSelector) as HTMLElement;
+
     console.log({article});
 
     if (!article) return;
@@ -650,9 +694,10 @@ export class TimedTextPlayer extends LitElement {
 
     console.log({element});
 
-    const sectionElement = element.parentElement?.parentElement; // this.parents(element, 'section')[0];
+    // const sectionElement = element.parentElement?.parentElement;
+    const sectionElement =  element.closest('section'); // this.parents(element, 'section')[0];
 
-    console.log({sectionElement});
+    // console.log({sectionElement});
 
     const section = this.track?.children.find((c) => c.metadata.element === sectionElement);
 
@@ -740,8 +785,10 @@ export class TimedTextPlayer extends LitElement {
   @state()
   _clip = null;
   _timedText = null;
-  private _dispatchTimedTextEvent() {
-    const {section, clip, timedText} = this._clipAtTime(this.time);
+  _timedTextTime = 0;
+  _eventCounter = 0;
+  private _dispatchTimedTextEvent(time?: number | undefined) {
+    const {section, clip, timedText} = this._clipAtTime(time ?? this.time);
     if (!section || !clip) return;
 
     const sectionIndex = this.track?.children.indexOf(section);
@@ -755,16 +802,36 @@ export class TimedTextPlayer extends LitElement {
       // this.dispatchEvent(new CustomEvent('playhead', {detail: {clip, section, offset}}));
       this._clip = clip;
     }
-    if (this._timedText !== timedText) {
-      this.dispatchEvent(new CustomEvent('playhead', {detail: {timedText, clip, section, offset}}));
+    // if (this._timedText !== timedText) {
+    if (this._timedTextTime !== time ?? this.time) {
+        this.dispatchEvent(new CustomEvent('playhead', {
+        bubbles: true,
+        detail: {
+          counter: this._eventCounter++,
+          text: timedText?.texts,
+          time: this.time,
+          offset,
+          pseudo: !!time,
+          pseudoTime: time,
+          transcript: this.transcriptTemplateSelector,
+          media: section.media_reference.target,
+          timedText,
+          clip,
+          section,
+        }
+      }));
       this._timedText = timedText;
+      this._timedTextTime = time ?? this.time;
+    } else {
+      console.log('same timed text', time ?? this.time);
     }
+    // TODO emit also source href, such that source pane can be activated and have sync karaoke?
   }
 
 
   private _seek(time: number) {
     const player = this._playerAtTime(time);
-    console.log({time, player});
+    console.log('_seek', {time, player});
     if (!player) return;
 
     const currentPlayer = this._currentPlayer();
