@@ -1,5 +1,5 @@
 {
-  "name": "@theirstory/timedtext-player",
+  "name": "@theirstoryinc/timedtext-player",
   "version": "0.0.1",
   "description": "Timed Text player web component",
   "main": "dist/timedtext-player.js",

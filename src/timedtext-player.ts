@@ -54,6 +54,7 @@ export class TimedTextPlayer extends LitElement {
     }
     video {
       /* width: 640px; */
+      width: 610px !important; height: 360px !important;
     }
     video::cue {
       /* margin-bottom: 40px !important; */
@@ -524,7 +525,7 @@ export class TimedTextPlayer extends LitElement {
     // console.log({overlay, clip: this._clip});
 
 
-    return html`<div style="width: 100%; height: 100%">
+    return html`<div style="width: 610px !important; height: 360px !important;">
       ${this.track && this.track.children.length > 0 ? this.track.children.map((clip, i, arr) => {
         const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
         const duration = clip.source_range.duration;
@@ -558,11 +559,11 @@ export class TimedTextPlayer extends LitElement {
         // if (overlays?.length ?? 0 > 0)
         // console.log({overlays});
 
-        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="width: 100%; height: 100%"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
+        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="width: 610px !important; height: 360px !important;"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
             data-offset=${offset}
             _class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
-            style="width: 100%; height: 100%"
+            style="width: 610px !important; height: 360px !important;"
 
             @timeupdate=${this._onTimeUpdate}
             @canplay=${this._onCanPlay}
@@ -594,7 +595,7 @@ export class TimedTextPlayer extends LitElement {
             <!-- overlays -->
             ${overlays}
           </div>`;
-      }) : html`<video style="width: 100%; height: 100%" poster="https://placehold.co/620x400?text=no+signal"></video>`}
+      }) : html`<video style="width: 610px !important; height: 360px !important;" poster="https://placehold.co/620x400?text=no+signal"></video>`}
       ${overlay}
       </div>
       <!-- <div style="height: 40px"></div> -->
