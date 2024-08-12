@@ -3,35 +3,11 @@
 import {LitElement, css} from 'lit';
 import {html, unsafeStatic} from 'lit/static-html.js';
 import {customElement, state, property, queryAll} from 'lit/decorators.js';
+import {repeat} from 'lit/directives/repeat.js';
 
-import {finder} from '@medv/finder';
+import {interpolate, dom2otio} from './utils';
+import {Track} from './interfaces';
 
-import {interpolate} from './utils';
-import {Clip, Gap, TimedText, Track, Effect} from './interfaces';
-
-
-// class TextTrack {
-//   constructor(players: NodeListOf<HTMLMediaElement>) {
-//     this._players = players;
-//   }
-
-//   _players: NodeListOf<HTMLMediaElement>;
-
-//   _mode = 'showing' as TextTrackMode;
-
-//   get mode(): TextTrackMode {
-//     return this._mode;
-//   }
-
-//   set mode(mode: TextTrackMode) {
-//     console.log(`setting mode to ${mode}`, this._players);
-//     this._mode = mode;
-//     this._players.forEach((p) => {
-//       const track = p.textTracks[0];
-//       if (track) track.mode = mode;
-//     });
-//   }
-// }
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
@@ -51,10 +27,6 @@ export class TimedTextPlayer extends LitElement {
       display: inline-block;
       /* display: none; */
       color: white;
-    }
-    video {
-      /* width: 640px; */
-      width: 610px !important; height: 360px !important;
     }
     video::cue {
       /* margin-bottom: 40px !important; */
@@ -77,21 +49,14 @@ export class TimedTextPlayer extends LitElement {
       /* outline: 4px solid red; */
       display: block !important;
     }
-    *[data-t] {
-      /* margin: 10px; */
-    }
     .wrapper {
       position: relative;
       /* display: inline-block; */
       display: none;
       color: white;
     }
-    video {
-      /* width: 320px; */
-    }
     video::cue {
-      /* padding-bottom: 40px !important; */
-      /* color: red !important; */
+      text-wrap: balance;
     }
   `;
 
@@ -100,6 +65,9 @@ export class TimedTextPlayer extends LitElement {
 
   @property({type: Number})
   height: number | undefined;
+
+  @property({type: String})
+  poster: string | undefined;
 
 
   @state()
@@ -133,9 +101,17 @@ export class TimedTextPlayer extends LitElement {
   }
 
   public play() {
-    const player = this._currentPlayer();
+    let player = this._currentPlayer();
+    console.log({player}, this.currentTime, this.duration);
     if (!player) return;
-    player.play();
+
+    if (this.duration - this.currentTime < 0.4) { // FIXME
+      this._seek(0);
+      player = this._playerAtTime(0);
+      player!.play();
+    } else {
+      player!.play();
+    }
   }
 
   public pause() {
@@ -195,272 +171,20 @@ export class TimedTextPlayer extends LitElement {
     });
   }
 
-  // const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-  private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
-    if (!sections) return;
-
-    this.track = {
-      OTIO_SCHEMA: 'Track.1',
-      name: 'Transcript',
-      kind: 'Video',
-      children: Array.from(sections).map((s): Clip => {
-        const src = s.getAttribute('data-media-src');
-        const [start, end] = (s.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-
-        const children: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('p[data-t]:not(*[data-effect]), div[data-t]:not(*[data-effect])');
-        const effects: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('div[data-t][data-effect]');
-
-        return {
-          OTIO_SCHEMA: 'Clip.1', // TODO: verify with OTIO spec, should be Composable?
-          source_range: {
-            start_time: start,
-            duration: end - start
-          },
-          media_reference: {
-            OTIO_SCHEMA: 'MediaReference.1',
-            target: src,
-          },
-          metadata: {
-            element: s,
-            selector: finder(s, {root: s.parentElement as HTMLElement}),
-            playerTemplateSelector: s.getAttribute('data-player'),
-            data: s.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: s.getAttribute(n)}), {}),
-          },
-          children: Array.from(children).map((c): Clip | Gap => {
-            const [start, end] = (c.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-            const children: NodeListOf<HTMLElement> | undefined = c.querySelectorAll('*[data-t],*[data-m]');
-            const segmenter = new (Intl as any).Segmenter('en', { granularity: 'sentence' }); // TODO language detection? from page?
-            // const text = c.textContent ?? ''; // TBD this has a lot of whitespace and might have non timed text?
-            const text = Array.from(children).map((t) => t.textContent).join(' '); // TBD this is the timed text only
-            const sentences = [...segmenter.segment(text)[Symbol.iterator]()].map(({index, segment: text}) => ({index, text}));
-
-            return {
-              OTIO_SCHEMA: 'Clip.1',
-              source_range: {
-                start_time: start,
-                duration: end - start
-              },
-              media_reference: {
-                OTIO_SCHEMA: 'MediaReference.1',
-                target: src,
-              },
-              metadata: {
-                element: c,
-                transcript: c.textContent,
-                selector: finder(c, {root: s.parentElement as HTMLElement}),
-                data: c.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: c.getAttribute(n)}), {}),
-                text,
-                sentences,
-              },
-              timed_texts: Array.from(children).map((t, i, arr) => {
-                let start, end;
-                if (t.getAttribute('data-t')) {
-                  const f = (t.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-                  start = f[0];
-                  end = f[1];
-                } else {
-                  start = parseFloat(t.getAttribute('data-m') ?? '') / 1e3;
-                  end = start + parseFloat(t.getAttribute('data-d') ?? '') / 1e3;
-                }
-
-                const prefix = arr.slice(0, i).map((t) => t.textContent ?? '').join(' ') + (i > 0 ? ' ' : '');
-                const textOffset = prefix.length;
-                const text = (t.textContent ?? '');
-                const sentence = Array.from(sentences).reverse().find(({index}) => textOffset >= index);
-                const sos = sentence?.index === textOffset;
-                const eos = sentence?.index + sentence?.text.trim().length === textOffset + text.length;
-                const punct = !!text.trim().charAt(text.length - 1).match(/\p{P}/gu);
-
-                return {
-                  OTIO_SCHEMA: 'TimedText.1',
-                  marked_range: {
-                    start_time: start,
-                    duration: end - start
-                  },
-                  texts: t.textContent ?? '',
-                  style_ids: [],
-                  metadata: {
-                    element: t,
-                    selector: finder(t, {root: s.parentElement as HTMLElement}),
-                    textOffset,
-                    sos,
-                    eos,
-                    length: text.length,
-                    punct,
-                    // ruby: `<ruby>${text}<rt>${eos ? 'eos ' : ''}${sos ? 'sos ' : ''}${punct ? 'punct ' : ''}</rt></ruby>`,
-                    ruby: `<ruby>${text}</ruby>`, // FIXME
-                  },
-                } as unknown as TimedText;
-              }),
-              effects: [],
-            } as unknown as Clip;
-          }) //
-          .map((p) => {
-            const tt = (p as Clip).timed_texts ?? [];
-
-            tt.forEach((t, i, arr) => {
-              if (i === 0) return;
-              const prev = arr[i - 1];
-              if (t.metadata.sos) prev.metadata.eos = true;
-            });
-
-            tt.forEach((t, i, arr) => {
-              if (i === 0) {
-                t.metadata.lastBreak = 0;
-                t.metadata.captionGroup = `c${p.source_range.start_time}-${t.metadata.lastBreak}`;
-                return;
-              }
-
-              t.metadata.lastBreak = arr[i - 1].metadata.lastBreak;
-              t.metadata.captionGroup = `c${p.source_range.start_time}-${t.metadata.lastBreak}`;
-
-              if (t.metadata.textOffset + t.metadata.length - t.metadata.lastBreak >= 37 * 2 || i === arr.length - 1) {
-                const candidates = arr.slice(i - 5 < 0 ? 0 : i - 5, i);
-
-                // find previous punctuation
-                let item =
-                  candidates.reverse().find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? t;
-                item.metadata.pilcrow0 = true;
-
-                //  avoid widows
-                if (i < tt.length - 5) {
-                  // look ahead 2 items for punctuation
-                  item = tt.slice(i, i + 3).find(({metadata: { punct }}) => punct) ?? t;
-                  item.metadata.pilcrow2 = true;
-                } else if (i >= tt.length - 5) {
-                  // we have few items left, use first candidates (eos, punct)
-                  item = tt.slice(i).find(({metadata: { eos }}) => eos) ?? candidates.find(({metadata: { punct }}) => punct) ?? t;
-                  item.metadata.pilcrow3 = true;
-                }
-
-                t.metadata.pilcrow = true;
-                t.metadata.lastBreak = t.metadata.textOffset + t.metadata.length + 1;
-                // item.metadata.lastBreak = item.metadata.textOffset + item.metadata.length + 1;
-              }
-            });
-
-            return p;
-          }).reduce((acc, c, i, arr) => {
-            if (i === 0 || i === arr.length - 1) return [...acc, c];
-            const prev = arr[i - 1];
-            if (c.source_range.start_time === prev.source_range.start_time + prev.source_range.duration) return [...acc, c];
-            const gap = { // TODO TBD if this is gap or speechless clip?
-              OTIO_SCHEMA: 'Gap.1',
-              source_range: {
-                start_time: prev.source_range.start_time + prev.source_range.duration,
-                duration: c.source_range.start_time - (prev.source_range.start_time + prev.source_range.duration)
-              },
-              media_reference: {
-                OTIO_SCHEMA: 'MediaReference.1',
-                target: src,
-              }
-            } as unknown as Gap;
-            return [...acc, gap, c];
-          }, [] as Clip[] | Gap[]),
-          effects: Array.from(effects).map((effect): Effect => {
-            return {
-              name: effect.getAttribute('data-effect') ?? '',
-              metadata: {
-                element: effect,
-                selector: finder(effect, {root: s.parentElement as HTMLElement}),
-                data: effect.getAttributeNames().filter(n => n.startsWith('data-')).reduce((acc, n) => ({...acc, [n.replace('data-', '').replace('-', '_')]: effect.getAttribute(n)}), {}),
-              },
-              source_range: {
-                start_time: parseFloat(effect.getAttribute('data-t')?.split(',')[0] ?? '0'),
-                duration: parseFloat(effect.getAttribute('data-t')?.split(',')[1] ?? '0') - parseFloat(effect.getAttribute('data-t')?.split(',')[0] ?? '0'),
-              }
-            } as unknown as Effect;
-          })
-        } as unknown as Clip;
-      }).map((segment) => {
-        segment.metadata.captions = this.getCaptions(segment);
-        segment.metadata.captionsUrl = URL.createObjectURL(new Blob([segment.metadata.captions], { type: "text/vtt" }))
-        return segment;
-      }),
-      markers: [],
-      metadata: {},
-      effects: [],
-    } as Track;
-
-    console.log({track: this.track});
-
-
-
-    this._duration = this.track.children.reduce((acc, c) => acc + c.source_range.duration, 0);
-    // this.textTracks = [new TextTrack(this._players)]
+  private _getEventsCounter(player: HTMLMediaElement) {
+    return this._playersEventsCounter.get(player);
   }
 
-  private getCaptions(segment: Clip): string {
-    const clips = segment.children;
-    const timedTexts = clips.flatMap((c) => c.timed_texts ?? []);
-    const grouped = timedTexts.reduce((acc, obj) => {
-      // Initialize the sub-array for the group if it doesn't exist
-      if (!acc[obj.metadata.captionGroup]) {
-          acc[obj.metadata.captionGroup] = [];
-      }
-      // Append the object to the correct group
-      acc[obj.metadata.captionGroup].push(obj);
-      return acc;
-    }, {} as Record<string, TimedText[]>);
 
-    const captions = Object.values(grouped);
-    console.log({captions});
 
-    const captions2 = captions.reduce((acc, g) => {
-      const p = g.findIndex(t => t.metadata.pilcrow);
-      const p0 = g.findIndex(t => t.metadata.pilcrow0);
+  private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
+    const {track, duration} = dom2otio(sections) ?? {};
+    if (!track || !duration) return;
 
-      if (p0 < p) {
-        const tail = g.slice(p0 + 1);
-        tail[tail.length - 1].metadata.glue = true;
-        tail[tail.length - 1].metadata.pilcrow = false;
-        tail[tail.length - 1].metadata.pilcrow4 = true;
-        return [...acc, g.slice(0, p0 + 1), tail];
-      }
-      // default
-      return [...acc, g];
-    }, [] as TimedText[][]);
-
-    const captions3 = captions2.reduce((acc, g, i) => {
-      if (i === 0) return [...acc, g];
-      const prev = acc.pop();
-
-      if (prev && prev[prev.length - 1]?.metadata?.glue) {
-        return [...acc, [...prev, ...g]];
-      }
-
-      // default
-      return [...acc, prev, g];
-    }, [] as (TimedText[] | undefined)[]);
-
-    console.log({captions2, captions3});
-
-    const formatSeconds = (seconds: number): string => seconds ? new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23) : '00:00:00:000';
-
-    let vttOut = ['WEBVTT',
-    '',
-    'Kind: captions',
-    'Language: en-US', // TODO lift language from transcript?
-    '',
-    ''].join('\n');
-
-    (captions3 as any).forEach((tt: TimedText[], i: number) => {
-      const first = tt[0];
-      const last = tt[tt.length - 1];
-      // let text = tt.map(t => t.texts)
-      const text = tt.map((t) => t.metadata.ruby
-        // + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')
-        // + (t.metadata.pilcrow0 ? '<c.yellow>◊</c>' : '')
-        // + (t.metadata.pilcrow2 ? '<c.yellow>†</c>' : '')
-        // + (t.metadata.pilcrow3 ? '<c.yellow>‡</c>' : '')
-        // + (t.metadata.pilcrow4 ? '<c.yellow>⌑</c>' : '')
-        + `<${formatSeconds(t.marked_range.start_time)}>`).join(' ');
-      // const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + (t.metadata.pilcrow2 ? '<c.yellow>*</c>' : '')).join(' ');
-      const id = `${i}`;
-      vttOut += `${id}\n${formatSeconds(first?.marked_range?.start_time)} --> ${formatSeconds(last?.marked_range?.start_time + last?.marked_range?.duration)}\n${text}\n\n`;
-    });
-
-    return vttOut;
+    this.track = track;
+    this._duration = duration;
+    this.dispatchEvent(new CustomEvent('durationchange'));
+    setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
   }
 
   @property({type: String, attribute: 'pause-mutation-observer'})
@@ -525,8 +249,13 @@ export class TimedTextPlayer extends LitElement {
     // console.log({overlay, clip: this._clip});
 
 
-    return html`<div style="width: 610px !important; height: 360px !important;">
-      ${this.track && this.track.children.length > 0 ? this.track.children.map((clip, i, arr) => {
+    let size = this.width ? `width: ${this.width}px !important;` : '';
+    size += this.height ? `height: ${this.height}px !important;` : '';
+    return html`<div style="${size}">
+      ${this.track && this.track.children.length > 0 ?
+      repeat(this.track.children, (clip) => clip.metadata.id, (clip, i) => {
+      // this.track.children.map((clip, i, arr) => {
+        const arr = this.track?.children ?? [];
         const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
         const duration = clip.source_range.duration;
 
@@ -556,14 +285,12 @@ export class TimedTextPlayer extends LitElement {
           return null;
         });
 
-        // if (overlays?.length ?? 0 > 0)
-        // console.log({overlays});
-
-        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="width: 610px !important; height: 360px !important;"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
+        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="${size}"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
             data-offset=${offset}
             _class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
-            style="width: 610px !important; height: 360px !important;"
+            style="${size}"
+            poster="${this.poster ?? ''}"
 
             @timeupdate=${this._onTimeUpdate}
             @canplay=${this._onCanPlay}
@@ -595,11 +322,10 @@ export class TimedTextPlayer extends LitElement {
             <!-- overlays -->
             ${overlays}
           </div>`;
-      }) : html`<video style="width: 610px !important; height: 360px !important;" poster="https://placehold.co/620x400?text=no+signal"></video>`}
+      }) : html`<video style="${size}" poster="${this.poster ?? ''}"></video>`}
       ${overlay}
       </div>
-      <!-- <div style="height: 40px"></div> -->
-      <!-- <slot name="transcript" @slotchange=${this.handleSlotchange} @click=${this.handleSlotClick}></slot> -->
+      <div style="height: 40px"></div>
     `;
   }
 
@@ -616,6 +342,7 @@ export class TimedTextPlayer extends LitElement {
   private _relayEvent(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     this._countEvent(e);
     console.log(e.type);
+    // TODO whitelist what events to relay
     // this.dispatchEvent(new CustomEvent(e.type));
   }
 
@@ -756,23 +483,30 @@ export class TimedTextPlayer extends LitElement {
     const clip = section.children.find((c) => {
       const start = c.source_range.start_time;
       const end = c.source_range.start_time + c.source_range.duration;
-      return start <= sourceTime && sourceTime <= end;
+      return start <= sourceTime && sourceTime < end;
     });
     if (!clip) return {section, clip: null, timedText: null};
 
     let timedText = clip.timed_texts?.find((t) => { // find in range
       const start = t.marked_range.start_time;
       const end = t.marked_range.start_time + t.marked_range.duration;
-      return start <= sourceTime && sourceTime <= end;
+      return start <= sourceTime && sourceTime < end; // FIXME off by one, use < end
     })
 
-    const altTimedText = clip.timed_texts?.find((t) => { // find in gap before
-      const start = t.marked_range.start_time;
-      return sourceTime < start;
-    }) ?? [...(clip?.timed_texts ?? [])].reverse().find((t) => { // find in gap after
+    // const altTimedText = clip.timed_texts?.find((t) => { // find in gap before
+    //   const start = t.marked_range.start_time;
+    //   return sourceTime < start;
+    // }) ?? [...(clip?.timed_texts ?? [])].reverse().find((t) => { // find in gap after
+    //   const start = t.marked_range.start_time;
+    //   return start <= sourceTime;
+    // });
+
+    const altTimedText = [...(clip?.timed_texts ?? [])].reverse().find((t) => { // find in gap after
       const start = t.marked_range.start_time;
       return start <= sourceTime;
     });
+
+
 
     if (!timedText && altTimedText) {
       // console.log({time, offset, sourceTime, altTimedText});
@@ -804,7 +538,7 @@ export class TimedTextPlayer extends LitElement {
       this._clip = clip;
     }
     // if (this._timedText !== timedText) {
-    if (this._timedTextTime !== time ?? this.time) {
+    if (this._timedTextTime !== time && this.time) {
         this.dispatchEvent(new CustomEvent('playhead', {
         bubbles: true,
         detail: {
@@ -830,7 +564,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
 
-  private _seek(time: number) {
+  private _seek(time: number, emitTimeUpdate = false) {
     const player = this._playerAtTime(time);
     console.log('_seek', {time, player});
     if (!player) return;
@@ -842,8 +576,17 @@ export class TimedTextPlayer extends LitElement {
 
     const playing = !!this.playing;
     if (playing && currentPlayer && currentPlayer !== player) currentPlayer.pause();
-    player.currentTime = time - offset + start;
+    // player.currentTime = time - offset + start;
+    this._seekMediaElement(player, time - offset + start, '_seek');
     if (playing && currentPlayer && currentPlayer !== player) this.playing = true;
+
+    // if (emitTimeUpdate) { // FIXME
+    //   console.log('events fired');
+    //   this.dispatchEvent(new CustomEvent('progress'));
+    //   this.dispatchEvent(new CustomEvent('timeupdate'));
+    //   this.dispatchEvent(new CustomEvent('durationchange'));
+    //   // this.time = time;
+    // }
   }
 
 
@@ -875,18 +618,23 @@ export class TimedTextPlayer extends LitElement {
     if (this._end !== this._duration && this.time >= this._end) player.pause();
 
     if (player.currentTime < start) {
-      player.currentTime = start;
+      // player.currentTime = start;
+      // this._seekMediaElement(player, start, '_onTimeUpdate < start');
       player.pause();
     } else if (start <= player.currentTime && player.currentTime <= end) {
       // if (this.playing && player.paused && player.currentTime - start + offset === this.time) player.play();
       if (player.currentTime !== start) this.time = player.currentTime - start + offset; // FIXME: that "if" to avoid 1st seek time update
+      // this.time = player.currentTime - start + offset;
       if (nextPlayer) {
         const [start3] = (nextPlayer.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-        if (nextPlayer.currentTime !== start3) nextPlayer.currentTime = start3;
+        if (nextPlayer.currentTime !== start3) {
+          // nextPlayer.currentTime = start3;
+          this._seekMediaElement(nextPlayer, start3, 'nextPlayer');
+        }
       }
       this.dispatchEvent(new CustomEvent('timeupdate'));
       this._dispatchTimedTextEvent();
-    } else if (end < player.currentTime) {
+    } else if (end <= player.currentTime) {
       player.pause();
       // TEST simulate overlap on clips
       // setTimeout(() => {
@@ -896,14 +644,21 @@ export class TimedTextPlayer extends LitElement {
     }
   }
 
+  private _seekMediaElement(element: HTMLAudioElement | HTMLVideoElement, time: number, label: string) {
+    console.log(`seeking ${label} to ${time}`, element);
+    element.currentTime = time;
+  }
+
   private _onCanPlay(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     this._countEvent(e);
     const {target: player} = e;
 
-    if (player.currentTime > 0) return;
+    // if (player.currentTime > 0) return;
+    if ((this._getEventsCounter(player)?.canplay ?? -1) > 1) return;
     const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
 
-    player.currentTime = start;
+    // player.currentTime = start;
+    this._seekMediaElement(player, start, '_onCanPlay');
   }
 
   private _onPlay(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
@@ -919,6 +674,12 @@ export class TimedTextPlayer extends LitElement {
     this._triggerTimeUpdate();
   }
 
+
+  private _isLastPlayer(player: HTMLAudioElement | HTMLVideoElement) {
+    const players = Array.from(this._players);
+    return players.indexOf(player) === players.length - 1;
+  }
+
   private _onPause(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
     this._countEvent(e);
     if (this.seeking) return;
@@ -926,32 +687,18 @@ export class TimedTextPlayer extends LitElement {
     const {target: player} = e;
     const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
 
+    if (this._isLastPlayer(player)) {
+      this.playing = false;
+      this.dispatchEvent(new CustomEvent('pause'));
+      this.dispatchEvent(new CustomEvent('ended'));
+      return;
+    }
+
     if (start <= player.currentTime && player.currentTime <= end) {
       this.playing = false;
       this.dispatchEvent(new CustomEvent('pause'));
     }
   }
-
-  private handleSlotClick(e: MouseEvent & {target: HTMLElement}) {
-    if (e.target.nodeName !== 'SPAN') return;
-    // const [start, end] = (e.target.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
-  }
-
-  private handleSlotchange(e: Event & {target: HTMLSlotElement}) {
-    console.log('SLOT CHANGE');
-    const childNodes = e.target.assignedNodes({flatten: true});
-
-    const article = childNodes.find((n) => n.nodeName === 'ARTICLE') as HTMLElement | undefined;
-    if (!article) return;
-
-    this._observer = new MutationObserver(this.callback.bind(this));
-    this._observer.observe(article, { attributes: true, childList: true, subtree: true });
-
-    const sections: NodeListOf<HTMLElement> | undefined = article?.querySelectorAll('section[data-media-src]') ;
-    this._dom2otio(sections);
-  }
-
-
 
   // protected override createRenderRoot() {
   //   return this;
@@ -964,16 +711,5 @@ declare global {
   }
 }
 
-
-
-// TODO move
-// const groupBy = <T>(array: Array<T>, property: (x: T) => string): { [key: string]: Array<T> } =>
-//   array.reduce((memo: { [key: string]: Array<T> }, x: T) => {
-//     if (!memo[property(x)]) {
-//       memo[property(x)] = [];
-//     }
-//     memo[property(x)].push(x);
-//     return memo;
-//   }, {});
 
 
