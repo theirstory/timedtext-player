@@ -10,6 +10,7 @@
     "OTIO",
     "Parens",
     "pilcrow",
+    "playhead",
     "punct",
     "saucelabs",
     "Slotchange",
@@ -21,5 +22,11 @@
     "webcomponents",
     "webcomponentsjs",
     "WEBVTT"
-  ]
+  ],
+  "cSpell.language": "en,en-GB",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "editor.formatOnSave": true
 }

@@ -1,6 +1,6 @@
 # TimedText Player
 
-Based on https://github.com/lit/lit-element-starter-ts and https://github.com/TonySpegel/swipeable-element 
+Based on https://github.com/lit/lit-element-starter-ts and https://github.com/TonySpegel/swipeable-element
 
 ## LitElement TypeScript starter
 

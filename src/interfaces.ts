@@ -30,7 +30,8 @@ export interface Clip {
   timed_texts: TimedText[] | null;
 }
 
-export interface Gap { // TODO: verify with OTIO spec
+export interface Gap {
+  // TODO: verify with OTIO spec
   OTIO_SCHEMA: string;
   markers: any[]; // Replace 'any' with a more specific type if markers have a defined structure
   media_reference: any | null; // Replace 'any' with a specific type if media references have a defined structure

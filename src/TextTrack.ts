@@ -1,4 +1,3 @@
-
 // class TextTrack {
 //   constructor(players: NodeListOf<HTMLMediaElement>) {
 //     this._players = players;
