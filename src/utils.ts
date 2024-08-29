@@ -4,10 +4,22 @@ import {finder} from '@medv/finder';
 
 import {Clip, TimedText, Track, Gap, Effect} from './interfaces';
 
-export function interpolate(str:string, params: {[key: string]: any}) {
+
+function escapeHTML(str: string): string {
+  const escapeChars: {[key: string]: string} = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return str.toString().replace(/[&<>"']/g, char => escapeChars[char]);
+}
+
+export function interpolate(str: string, params: {[key: string]: any}) {
   let names = Object.keys(params);
   let vals = Object.values(params);
-  return new Function(...names, `return \`${str}\`;`)(...vals);
+  return new Function(...names, `return \`${str}\`;`)(...vals.map(escapeHTML));
 }
 
 export function getTimeRange(element: HTMLElement): number[] {
@@ -112,6 +124,8 @@ export function dom2otio(sections: NodeListOf<HTMLElement> | undefined): {track:
 
       const children: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('p[data-t]:not(*[data-effect]), div[data-t]:not(*[data-effect])');
       const effects: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('div[data-t][data-effect]');
+
+      // console.log('TRACK', {src, id, start, end, children, effects});
 
       return {
         OTIO_SCHEMA: 'Clip.1', // TODO: verify with OTIO spec, should be Composable?

@@ -1,80 +1,82 @@
 /* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {LitElement, css} from 'lit';
-import {html, unsafeStatic} from 'lit/static-html.js';
-import {customElement, state, property, queryAll} from 'lit/decorators.js';
-import {repeat} from 'lit/directives/repeat.js';
+import { LitElement, css } from 'lit';
+import { html, unsafeStatic } from 'lit/static-html.js';
+// import { render } from 'lit/html';
+import { customElement, state, property, queryAll } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 
-import {interpolate, dom2otio} from './utils';
-import {Track} from './interfaces';
-
+import { interpolate, dom2otio } from './utils';
+import { Track } from './interfaces';
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
-  static override styles = document.location.href.indexOf('debug') > 0 ? css`
-    :host {
-      display: block;
-    }
-    .active {
-      outline: 4px solid red;
-      /* display: block !important; */
-    }
-    *[data-t] {
-      margin: 10px;
-    }
-    .wrapper {
-      position: relative;
-      display: inline-block;
-      /* display: none; */
-      color: white;
-    }
-    video::cue {
-      /* margin-bottom: 40px !important; */
-      color: green !important;
-    }
-    video::cue(.yellow) {
-      color: yellow;
-    }
-    ::cue:past {
-      color: white;
-    }
-    ::cue:future {
-      color: grey;
-    }
-  ` : css`
-  :host {
-      display: block;
-    }
-    .active {
-      /* outline: 4px solid red; */
-      display: block !important;
-    }
-    .wrapper {
-      position: relative;
-      /* display: inline-block; */
-      display: none;
-      color: white;
-    }
-    video::cue {
-      text-wrap: balance;
-    }
-  `;
+  static override styles =
+    document.location.href.indexOf('debug') > 0
+      ? css`
+          :host {
+            display: block;
+          }
+          .active {
+            outline: 4px solid red;
+            /* display: block !important; */
+          }
+          *[data-t] {
+            margin: 10px;
+          }
+          .wrapper {
+            position: relative;
+            display: inline-block;
+            /* display: none; */
+            color: white;
+          }
+          video::cue {
+            /* margin-bottom: 40px !important; */
+            color: green !important;
+          }
+          video::cue(.yellow) {
+            color: yellow;
+          }
+          ::cue:past {
+            color: white;
+          }
+          ::cue:future {
+            color: grey;
+          }
+        `
+      : css`
+          :host {
+            display: block;
+          }
+          .active {
+            /* outline: 4px solid red; */
+            display: block !important;
+          }
+          .wrapper {
+            position: relative;
+            /* display: inline-block; */
+            display: none;
+            color: white;
+          }
+          video::cue {
+            text-wrap: balance;
+          }
+        `;
 
-  @property({type: Number})
+  @property({ type: Number })
   width: number | undefined;
 
-  @property({type: Number})
+  @property({ type: Number })
   height: number | undefined;
 
-  @property({type: String})
+  @property({ type: String })
   poster: string | undefined;
-
 
   @state()
   time = 0;
 
   set currentTime(time: number) {
-    console.log({setCurrentTime: time});
+    console.log({ setCurrentTime: time });
     this._seek(time);
     // cancel end
     this._end = this._duration;
@@ -90,7 +92,7 @@ export class TimedTextPlayer extends LitElement {
 
   get seeking() {
     const players = Array.from(this._players);
-    return players.some((p) => p.seeking);
+    return players.some(p => p.seeking);
   }
 
   @state()
@@ -102,10 +104,11 @@ export class TimedTextPlayer extends LitElement {
 
   public play() {
     let player = this._currentPlayer();
-    console.log({player}, this.currentTime, this.duration);
+    console.log({ player }, this.currentTime, this.duration);
     if (!player) return;
 
-    if (this.duration - this.currentTime < 0.4) { // FIXME
+    if (this.duration - this.currentTime < 0.4) {
+      // FIXME
       this._seek(0);
       player = this._playerAtTime(0);
       player!.play();
@@ -130,8 +133,10 @@ export class TimedTextPlayer extends LitElement {
   _muted = false;
 
   set muted(muted: boolean) {
-    this._players.forEach((p) => p.muted = muted);
+    this._players.forEach(p => (p.muted = muted));
     this._muted = muted;
+    // emit volumechange
+    this.dispatchEvent(new CustomEvent('volumechange'));
   }
 
   get muted() {
@@ -141,11 +146,12 @@ export class TimedTextPlayer extends LitElement {
   _volume = 1;
 
   get volume() {
-    return this._volume;
+    return this._players?.[0]?.volume ?? this._volume;
   }
 
   set volume(volume: number) {
-    this._players.forEach((p) => p.volume = volume);
+    this._volume = volume;
+    this._players.forEach(p => (p.volume = volume));
   }
 
   @state()
@@ -160,14 +166,13 @@ export class TimedTextPlayer extends LitElement {
   //   return this._playersReady.includes(player);
   // }
 
-
   // textTracks: TextTrack[] = [];
 
   _playersEventsCounter: Map<HTMLMediaElement, Record<string, number>> = new Map();
 
   get playersEventsCounter() {
     return Array.from(this._playersEventsCounter.entries()).map(([player, eventsCounter]) => {
-      return {player, eventsCounter};
+      return { player, eventsCounter };
     });
   }
 
@@ -175,10 +180,8 @@ export class TimedTextPlayer extends LitElement {
     return this._playersEventsCounter.get(player);
   }
 
-
-
   private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
-    const {track, duration} = dom2otio(sections) ?? {};
+    const { track, duration } = dom2otio(sections) ?? {};
     if (!track || !duration) return;
 
     this.track = track;
@@ -187,54 +190,61 @@ export class TimedTextPlayer extends LitElement {
     setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
   }
 
-  @property({type: String, attribute: 'pause-mutation-observer'})
-  pauseMutationObserver = "false";
+  @property({ type: String, attribute: 'pause-mutation-observer' })
+  pauseMutationObserver = 'false';
 
   public parseTranscript() {
     const article = document.querySelector(this.transcriptTemplateSelector) as HTMLElement;
 
-    console.log({article});
+    console.log({ article });
 
     if (!article) return;
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    console.log({sections});
+    console.log({ sections });
     this._dom2otio(sections);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private callback(mutationList: any, _observer: MutationObserver) {
-    if (this.pauseMutationObserver === "true") return; // FIXME property should be boolean but in react I get string
+    if (this.pauseMutationObserver === 'true') return; // FIXME property should be boolean but in react I get string
 
     let article;
+    let widget;
+    // let widgets = 0;
+    let nonwidgets = 0;
     for (const mutation of mutationList) {
       article = mutation.target.closest('article');
-      if (mutation.type === "childList") {
-        console.log("A child node has been added or removed.");
+      widget = mutation.target.closest('.widget');
+      if (mutation.type === 'childList') {
+        console.log('A child node has been added or removed.');
         // article = mutation.target;
-      } else if (mutation.type === "attributes") {
+      } else if (mutation.type === 'attributes') {
         console.log(`The ${mutation.attributeName} attribute was modified.`);
         // article = mutation.target.closest('article')
       }
+      // if (widget) break;
+      if (!widget) nonwidgets++;
     }
 
-    console.log({mutationList, _observer, article: article});
+    // if (widget) return;
+    if (nonwidgets === 0) return;
+
+    console.log({ mutationList, _observer, article: article });
     if (!article) return;
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    console.log({sections});
+    console.log({ sections });
     if (!sections || sections.length === 0) return;
     this._dom2otio(sections);
   }
 
   _observer: MutationObserver | undefined = undefined;
 
-
   // TODO transcriptSelector property
 
-  @property({type: String, attribute: 'player'})
+  @property({ type: String, attribute: 'player' })
   playerTemplateSelector = '';
 
-
-  @property({type: String, attribute: 'transcript'})
+  @property({ type: String, attribute: 'transcript' })
   transcriptTemplateSelector = 'article'; // TODO article has section data-t?
 
   override render() {
@@ -248,44 +258,78 @@ export class TimedTextPlayer extends LitElement {
     // }
     // console.log({overlay, clip: this._clip});
 
-
     let size = this.width ? `width: ${this.width}px !important;` : '';
     size += this.height ? `height: ${this.height}px !important;` : '';
     return html`<div style="${size}">
-      ${this.track && this.track.children.length > 0 ?
-      repeat(this.track.children, (clip) => clip.metadata.id, (clip, i) => {
-      // this.track.children.map((clip, i, arr) => {
-        const arr = this.track?.children ?? [];
-        const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
-        const duration = clip.source_range.duration;
+        ${this.track && this.track.children.length > 0
+          ? repeat(
+              this.track.children,
+              clip => clip.metadata.id,
+              (clip, i) => {
+                const arr = this.track?.children ?? [];
+                const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
+                const duration = clip.source_range.duration;
 
-        const template = document.createElement('template');
-        template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector)?.innerHTML ?? '').trim(), {
-          src: clip.media_reference.target,
-          captions: clip.metadata.captionsUrl,
-          ...clip.metadata?.data,
-          width: this.width ?? 'auto',
-          height: this.height ?? 'auto',
-        });
-        const node = template.content.childNodes[0] as HTMLElement;
-        const tag = node.nodeName.toLowerCase();
-        const attrs = Array.from(node.attributes).map((attr) => `${(attr.name)}=${attr.value !== '' ? attr.value : '""' }`);
-        const siblings = Array.from(template.content.childNodes).slice(1);
+                const template = document.createElement('template');
+                // template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector)?.innerHTML ?? '').trim(), {
+                //   src: clip.media_reference.target,
+                //   captions: clip.metadata.captionsUrl,
+                //   ...clip.metadata?.data,
+                //   width: this.width ?? 'auto',
+                //   height: this.height ?? 'auto',
+                // });
 
-        const overlays = clip.effects.flatMap((effect) => {
-          const start = effect.source_range.start_time - clip.source_range.start_time + offset;
-          const end = start + effect.source_range.duration;
-          // console.log({start, end, time: this.time});
-          if (start <= this.time && this.time < end) {
-            const progress = (this.time - start) / effect.source_range.duration;
-            const template = document.createElement('template');
-            template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? '').trim(), {progress, ...effect.metadata?.data});
-            return template.content.childNodes as NodeListOf<HTMLElement>;
-          }
-          return null;
-        });
+                const templateString = (
+                  document.querySelector<HTMLTemplateElement>(
+                    clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector,
+                  )?.innerHTML ?? ''
+                ).trim();
+                const props = {
+                  src: clip.media_reference.target,
+                  captions: clip.metadata.captionsUrl,
+                  ...clip.metadata?.data,
+                  width: this.width ?? 'auto',
+                  height: this.height ?? 'auto',
+                };
 
-        return html`<div class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'} style="${size}"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
+                template.innerHTML = interpolate(templateString, props);
+                // const interpolatedTemplate = new Function('html', 'props', `return html\`${templateString}\`;`)(html, props);
+                // console.log({interpolatedTemplate, templateString, props});
+
+                // template.innerHTML = interpolatedTemplate;
+                // render(interpolatedTemplate, template);
+                // render(html`<p>Hello</p>`, template);
+                console.log({ template: template.innerHTML });
+
+                const node = template.content.childNodes[0] as HTMLElement;
+                const tag = node.nodeName.toLowerCase();
+                const attrs = Array.from(node.attributes).map(
+                  attr => `${attr.name}=${attr.value !== '' ? attr.value : '""'}`,
+                );
+                const siblings = Array.from(template.content.childNodes).slice(1);
+
+                const overlays = clip.effects.flatMap(effect => {
+                  const id = `${clip.metadata.id}-${effect.metadata.id}`;
+                  const start = effect.source_range.start_time - clip.source_range.start_time + offset;
+                  const end = start + effect.source_range.duration;
+                  if (start <= this.time && this.time < end) {
+                    const progress = (this.time - start) / effect.source_range.duration;
+                    const template = document.createElement('template');
+                    template.innerHTML = interpolate(
+                      (
+                        document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? ''
+                      ).trim(),
+                      { progress, ...effect.metadata?.data },
+                    );
+                    return { id, children: template.content.childNodes as NodeListOf<HTMLElement> };
+                  }
+                  return null;
+                });
+                console.log({ overlays });
+
+                return html`<div class=${
+                  offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'
+                } style="${size}"><${unsafeStatic(tag)} ${unsafeStatic(attrs.join(' '))}
             data-t=${`${clip.source_range.start_time},${clip.source_range.start_time + duration}`}
             data-offset=${offset}
             _class=${offset <= this.time && this.time < offset + duration ? 'active' : ''}
@@ -319,31 +363,36 @@ export class TimedTextPlayer extends LitElement {
               ${node.children}
             </${unsafeStatic(tag)}>
             ${siblings}
-            <!-- overlays -->
-            ${overlays}
+            ${repeat(
+              overlays,
+              overlay => overlay?.id,
+              overlay => html`${overlay?.children}`,
+            )}
           </div>`;
-      }) : html`<video style="${size}" poster="${this.poster ?? ''}"></video>`}
-      ${overlay}
+              },
+            )
+          : html`<video style="${size}" poster="${this.poster ?? ''}"></video>`}
+        ${overlay}
       </div>
-      <div style="height: 40px"></div>
-    `;
+      <!-- <div style="height: 40px"></div> --> `;
   }
 
-  private _countEvent(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _countEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     if (this._playersEventsCounter.has(e.target as HTMLMediaElement)) {
       const eventsCounter = this._playersEventsCounter.get(e.target as HTMLMediaElement) ?? {};
       const counter = eventsCounter[e.type] ?? 0;
-      this._playersEventsCounter.set(e.target as HTMLMediaElement, {...eventsCounter, [e.type]: counter + 1});
+      this._playersEventsCounter.set(e.target as HTMLMediaElement, { ...eventsCounter, [e.type]: counter + 1 });
     } else {
-      this._playersEventsCounter.set(e.target as HTMLMediaElement, {[e.type]: 1});
+      this._playersEventsCounter.set(e.target as HTMLMediaElement, { [e.type]: 1 });
     }
   }
 
-  private _relayEvent(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _relayEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
     console.log(e.type);
     // TODO whitelist what events to relay
-    // this.dispatchEvent(new CustomEvent(e.type));
+    // TODO emit only current player events?
+    this.dispatchEvent(new CustomEvent(e.type));
   }
 
   _start = 0;
@@ -355,7 +404,7 @@ export class TimedTextPlayer extends LitElement {
     const url = new URL(window.location.href);
     const t = url.searchParams.get('t');
 
-    console.log({t});
+    console.log({ t });
 
     if (t) {
       const [start, end] = t.split(',').map(v => parseFloat(v));
@@ -363,7 +412,7 @@ export class TimedTextPlayer extends LitElement {
       this._start = start;
       this._end = end;
 
-      console.log({_start: this._start, _end: this._end});
+      console.log({ _start: this._start, _end: this._end });
 
       setTimeout(() => {
         this._seek(start);
@@ -374,7 +423,7 @@ export class TimedTextPlayer extends LitElement {
     }
   }
 
-  private _onLoadedMetadata(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _onLoadedMetadata(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
     // this.dispatchEvent(new CustomEvent(e.type));
 
@@ -387,10 +436,10 @@ export class TimedTextPlayer extends LitElement {
     }
   }
 
-  private _onSeeked(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _onSeeked(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
-    const {target: player} = e;
-    const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const { target: player } = e;
+    const [start, end] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
     if (start <= player.currentTime && player.currentTime <= end) {
@@ -403,59 +452,83 @@ export class TimedTextPlayer extends LitElement {
     // const article = document.getElementById('transcript');
     const article = document.querySelector(this.transcriptTemplateSelector) as HTMLElement;
 
-    console.log({article});
+    console.log({ article });
 
+    // TODO: create observers per section.
     if (!article) return;
     this._observer = new MutationObserver(this.callback.bind(this));
     this._observer.observe(article, { attributes: true, childList: true, subtree: true });
 
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    console.log({sections});
+    console.log({ sections });
     this._dom2otio(sections);
 
     article.addEventListener('click', this._transcriptClick.bind(this));
   }
 
   private _transcriptClick(e: MouseEvent) {
-    const element = e.target as HTMLElement;
-    if (!element || element?.nodeName !== 'SPAN') return;
+    const target = e.target as HTMLElement;
+    if (!target) return;
 
-    console.log({element});
+    let element = target;
+
+    console.log({ target });
+    // FIXME use closest as limit to go up and look down
+    if (!element.getAttribute('data-t')) {
+      element = element.querySelector('[data-t]') as HTMLElement;
+    }
+    if (!element) {
+      element = target.parentElement?.querySelector('[data-t]') as HTMLElement;
+    }
+    if (!element) {
+      element = target.parentElement?.parentElement?.querySelector('[data-t]') as HTMLElement;
+    }
+    if (!element) {
+      element = target.parentElement?.parentElement?.parentElement?.querySelector('[data-t]') as HTMLElement;
+    }
+    console.log({ element });
+
+    // if (element?.nodeName !== 'SPAN') return;
+    if (!element.getAttribute('data-t')) return;
 
     // const sectionElement = element.parentElement?.parentElement;
-    const sectionElement =  element.closest('section'); // this.parents(element, 'section')[0];
+    const sectionElement = element.closest('section'); // this.parents(element, 'section')[0];
 
     // console.log({sectionElement});
 
-    const section = this.track?.children.find((c) => c.metadata.element === sectionElement);
+    const section = this.track?.children.find(c => c.metadata.element === sectionElement);
 
-    console.log({section});
+    console.log({ section });
     if (!section) return;
 
     const sectionIndex = this.track?.children.indexOf(section);
-    const offset = this.track?.children.slice(0, sectionIndex).reduce((acc, c) => acc + c.source_range.duration, 0) ?? 0;
+    const offset =
+      this.track?.children.slice(0, sectionIndex).reduce((acc, c) => acc + c.source_range.duration, 0) ?? 0;
 
-    console.log({sectionIndex, offset});
+    console.log({ sectionIndex, offset });
 
     let start;
     if (element.getAttribute('data-t')) {
-      const f = (element.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+      const f = (element.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
       start = f[0];
     } else {
       start = parseFloat(element.getAttribute('data-m') ?? '') / 1e3;
     }
 
-    const time = start - section.source_range.start_time + offset;
+    // seek past start if section start time is word start time
+    // TODO randomise that 0.02
+    const time =
+      start - section.source_range.start_time + offset + (start === section.source_range.start_time ? 0.02 : 0);
 
-    console.log(time)
+    console.log(time);
 
     this._seek(time);
   }
 
   private _playerAtTime(time: number): HTMLMediaElement | undefined {
     const players = Array.from(this._players);
-    return players.find((p) => {
-      const [start, end] = (p.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    return players.find(p => {
+      const [start, end] = (p.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
       const offset = parseFloat(p.getAttribute('data-offset') ?? '0');
       return start <= time - offset + start && time - offset + start <= end;
     });
@@ -477,21 +550,24 @@ export class TimedTextPlayer extends LitElement {
     });
     if (!section) return {};
 
-    const offset = this.track.children.slice(0, this.track.children.indexOf(section)).reduce((acc, c) => acc + c.source_range.duration, 0);
+    const offset = this.track.children
+      .slice(0, this.track.children.indexOf(section))
+      .reduce((acc, c) => acc + c.source_range.duration, 0);
     const sourceTime = time - offset + section.source_range.start_time;
 
-    const clip = section.children.find((c) => {
+    const clip = section.children.find(c => {
       const start = c.source_range.start_time;
       const end = c.source_range.start_time + c.source_range.duration;
       return start <= sourceTime && sourceTime < end;
     });
-    if (!clip) return {section, clip: null, timedText: null};
+    if (!clip) return { section, clip: null, timedText: null };
 
-    let timedText = clip.timed_texts?.find((t) => { // find in range
+    let timedText = clip.timed_texts?.find(t => {
+      // find in range
       const start = t.marked_range.start_time;
       const end = t.marked_range.start_time + t.marked_range.duration;
       return start <= sourceTime && sourceTime < end; // FIXME off by one, use < end
-    })
+    });
 
     // const altTimedText = clip.timed_texts?.find((t) => { // find in gap before
     //   const start = t.marked_range.start_time;
@@ -501,19 +577,18 @@ export class TimedTextPlayer extends LitElement {
     //   return start <= sourceTime;
     // });
 
-    const altTimedText = [...(clip?.timed_texts ?? [])].reverse().find((t) => { // find in gap after
+    const altTimedText = [...(clip?.timed_texts ?? [])].reverse().find(t => {
+      // find in gap after
       const start = t.marked_range.start_time;
       return start <= sourceTime;
     });
-
-
 
     if (!timedText && altTimedText) {
       // console.log({time, offset, sourceTime, altTimedText});
       timedText = altTimedText;
     }
 
-    return {section, clip, timedText};
+    return { section, clip, timedText };
   }
 
   _section = null;
@@ -523,7 +598,7 @@ export class TimedTextPlayer extends LitElement {
   _timedTextTime = 0;
   _eventCounter = 0;
   private _dispatchTimedTextEvent(time?: number | undefined) {
-    const {section, clip, timedText} = this._clipAtTime(time ?? this.time);
+    const { section, clip, timedText } = this._clipAtTime(time ?? this.time);
     if (!section || !clip) return;
 
     const sectionIndex = this.track?.children.indexOf(section);
@@ -538,23 +613,26 @@ export class TimedTextPlayer extends LitElement {
       this._clip = clip;
     }
     // if (this._timedText !== timedText) {
-    if (this._timedTextTime !== time && this.time) {
-        this.dispatchEvent(new CustomEvent('playhead', {
-        bubbles: true,
-        detail: {
-          counter: this._eventCounter++,
-          text: timedText?.texts,
-          time: this.time,
-          offset,
-          pseudo: !!time,
-          pseudoTime: time,
-          transcript: this.transcriptTemplateSelector,
-          media: section.media_reference.target,
-          timedText,
-          clip,
-          section,
-        }
-      }));
+    // if (this._timedTextTime !== time && this.time) {
+    if (this.time) {
+      this.dispatchEvent(
+        new CustomEvent('playhead', {
+          bubbles: true,
+          detail: {
+            counter: this._eventCounter++,
+            text: timedText?.texts,
+            time: this.time,
+            offset,
+            pseudo: !!time,
+            pseudoTime: time,
+            transcript: this.transcriptTemplateSelector,
+            media: section.media_reference.target,
+            timedText,
+            clip,
+            section,
+          },
+        }),
+      );
       this._timedText = timedText;
       this._timedTextTime = time ?? this.time;
     } else {
@@ -563,15 +641,14 @@ export class TimedTextPlayer extends LitElement {
     // TODO emit also source href, such that source pane can be activated and have sync karaoke?
   }
 
-
   private _seek(time: number, emitTimeUpdate = false) {
     const player = this._playerAtTime(time);
-    console.log('_seek', {time, player});
+    console.log('_seek', { time, player, emitTimeUpdate });
     if (!player) return;
 
     const currentPlayer = this._currentPlayer();
 
-    const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const [start] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
     const playing = !!this.playing;
@@ -589,7 +666,6 @@ export class TimedTextPlayer extends LitElement {
     // }
   }
 
-
   _triggerTimeUpdateTimeout = 0;
   private _triggerTimeUpdate() {
     clearTimeout(this._triggerTimeUpdateTimeout);
@@ -599,15 +675,19 @@ export class TimedTextPlayer extends LitElement {
     if (!player) return;
 
     player.dispatchEvent(new Event('timeupdate'));
-    if (this.playing) this._triggerTimeUpdateTimeout = setTimeout(() => requestAnimationFrame(this._triggerTimeUpdate.bind(this)), 1000 / 15); // TODO use Clock
+    if (this.playing)
+      this._triggerTimeUpdateTimeout = setTimeout(
+        () => requestAnimationFrame(this._triggerTimeUpdate.bind(this)),
+        1000 / 15,
+      ); // TODO use Clock
   }
 
-  private _onTimeUpdate(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _onTimeUpdate(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
     if (this.playing && this.seeking) return;
 
-    const {target: player} = e;
-    const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const { target: player } = e;
+    const [start, end] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
     const players = Array.from(this._players);
@@ -626,7 +706,7 @@ export class TimedTextPlayer extends LitElement {
       if (player.currentTime !== start) this.time = player.currentTime - start + offset; // FIXME: that "if" to avoid 1st seek time update
       // this.time = player.currentTime - start + offset;
       if (nextPlayer) {
-        const [start3] = (nextPlayer.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+        const [start3] = (nextPlayer.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
         if (nextPlayer.currentTime !== start3) {
           // nextPlayer.currentTime = start3;
           this._seekMediaElement(nextPlayer, start3, 'nextPlayer');
@@ -649,22 +729,22 @@ export class TimedTextPlayer extends LitElement {
     element.currentTime = time;
   }
 
-  private _onCanPlay(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _onCanPlay(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
-    const {target: player} = e;
+    const { target: player } = e;
 
     // if (player.currentTime > 0) return;
     if ((this._getEventsCounter(player)?.canplay ?? -1) > 1) return;
-    const [start] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const [start] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
 
     // player.currentTime = start;
     this._seekMediaElement(player, start, '_onCanPlay');
   }
 
-  private _onPlay(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _onPlay(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
-    const {target: player} = e;
-    const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const { target: player } = e;
+    const [start, end] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
 
     if (start <= player.currentTime && player.currentTime <= end) {
       this.playing = true;
@@ -674,18 +754,17 @@ export class TimedTextPlayer extends LitElement {
     this._triggerTimeUpdate();
   }
 
-
   private _isLastPlayer(player: HTMLAudioElement | HTMLVideoElement) {
     const players = Array.from(this._players);
     return players.indexOf(player) === players.length - 1;
   }
 
-  private _onPause(e: Event & {target: HTMLAudioElement | HTMLVideoElement}) {
+  private _onPause(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
     if (this.seeking) return;
 
-    const {target: player} = e;
-    const [start, end] = (player.getAttribute('data-t') ?? '0,0' ).split(',').map(v => parseFloat(v));
+    const { target: player } = e;
+    const [start, end] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
 
     if (this._isLastPlayer(player)) {
       this.playing = false;
@@ -710,6 +789,3 @@ declare global {
     'timedtext-player': TimedTextPlayer;
   }
 }
-
-
-
