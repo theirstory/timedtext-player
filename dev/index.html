@@ -7,9 +7,9 @@
     <script src="../node_modules/@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
     <script src="../node_modules/lit/polyfill-support.js"></script>
     <script type="module" src="../dist/timedtext-player.js"></script>
-    <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/media-chrome@3.2.4/+esm"></script> -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/media-chrome@4/+esm"></script>
     <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/youtube-video-element@1"></script> -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/player.style/yt/+esm"></script>
+    <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/player.style/yt/+esm"></script> -->
 
     <style>
       html,
@@ -56,7 +56,7 @@
     </style>
   </head>
   <body>
-    <media-theme-yt>
+    <!-- <media-theme-yt>
       <timedtext-player
         slot="media"
         transcript="#transcript"
@@ -66,33 +66,32 @@
         height="300"
         poster="https://placehold.co/640x360?text=16:9"
       ></timedtext-player>
-    </media-theme-yt>
+    </media-theme-yt> -->
 
-    <!-- <media-controller id="myController">
-      <media-control-bar style="width: 100%">
-        <media-play-button></media-play-button>
-        <media-mute-button></media-mute-button>
-        <media-volume-range></media-volume-range>
-        <media-time-display></media-time-display>
-        <media-time-range></media-time-range>
-        <media-duration-display></media-duration-display>
-        <media-captions-button></media-captions-button>
-        <media-fullscreen-button></media-fullscreen-button>
-      </media-control-bar>
+    <div style="width: 600px; aspect-ratio: 16/9; background-color: cornflowerblue">
+      <media-controller id="myController">
+        <media-control-bar style="width: 100%">
+          <media-play-button></media-play-button>
+          <media-mute-button></media-mute-button>
+          <media-volume-range></media-volume-range>
+          <media-time-display></media-time-display>
+          <media-time-range></media-time-range>
+          <media-duration-display></media-duration-display>
+          <!-- <media-playback-rate-button></media-playback-rate-button> -->
+          <media-captions-button></media-captions-button>
+          <media-fullscreen-button></media-fullscreen-button>
+        </media-control-bar>
 
-      <timedtext-player
-        slot="media"
-        transcript="#transcript"
-        _transcript="#empty"
-        player="#video1"
-        width="520"
-        height="300"
-        poster="https://placehold.co/620x400?text=POSTER"
-      ></timedtext-player>
+        <timedtext-player
+          slot="media"
+          transcript="#transcript"
+          player="#video1"
+          poster="https://placehold.co/640x360?text=16:9"
+        ></timedtext-player>
 
-
-    </media-controller> -->
-    <!-- <media-loading-indicator slot="centered-chrome"></media-loading-indicator> -->
+        <!-- <media-loading-indicator slot="centered-chrome"></media-loading-indicator> -->
+      </media-controller>
+    </div>
 
     <template id="video1">
       <video src="${src}"></video>

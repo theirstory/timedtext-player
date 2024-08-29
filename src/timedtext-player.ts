@@ -63,11 +63,11 @@ export class TimedTextPlayer extends LitElement {
           }
         `;
 
-  @property({ type: Number })
-  width: number | undefined;
+  // @property({ type: Number })
+  // width: number | undefined;
 
-  @property({ type: Number })
-  height: number | undefined;
+  // @property({ type: Number })
+  // height: number | undefined;
 
   @property({ type: String })
   poster: string | undefined;
@@ -194,7 +194,9 @@ export class TimedTextPlayer extends LitElement {
   pauseMutationObserver = 'false';
 
   public parseTranscript() {
-    const article = document.querySelector(this.transcriptTemplateSelector) as HTMLElement;
+    if (!this.transcriptSelector) return;
+
+    const article = document.querySelector(this.transcriptSelector) as HTMLElement;
 
     console.log({ article });
 
@@ -242,10 +244,10 @@ export class TimedTextPlayer extends LitElement {
   // TODO transcriptSelector property
 
   @property({ type: String, attribute: 'player' })
-  playerTemplateSelector = '';
+  playerSelector: string | undefined;
 
   @property({ type: String, attribute: 'transcript' })
-  transcriptTemplateSelector = 'article'; // TODO article has section data-t?
+  transcriptSelector: string | undefined;
 
   override render() {
     let overlay;
@@ -258,8 +260,10 @@ export class TimedTextPlayer extends LitElement {
     // }
     // console.log({overlay, clip: this._clip});
 
-    let size = this.width ? `width: ${this.width}px !important;` : '';
-    size += this.height ? `height: ${this.height}px !important;` : '';
+    // let size = this.width ? `width: ${this.width}px !important;` : '';
+    // size += this.height ? `height: ${this.height}px !important;` : '';
+    const size = 'width: 100%; height: 100%;';
+
     return html`<div style="${size}">
         ${this.track && this.track.children.length > 0
           ? repeat(
@@ -271,7 +275,7 @@ export class TimedTextPlayer extends LitElement {
                 const duration = clip.source_range.duration;
 
                 const template = document.createElement('template');
-                // template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector)?.innerHTML ?? '').trim(), {
+                // template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerSelector)?.innerHTML ?? '').trim(), {
                 //   src: clip.media_reference.target,
                 //   captions: clip.metadata.captionsUrl,
                 //   ...clip.metadata?.data,
@@ -281,15 +285,17 @@ export class TimedTextPlayer extends LitElement {
 
                 const templateString = (
                   document.querySelector<HTMLTemplateElement>(
-                    clip.metadata.playerTemplateSelector ?? this.playerTemplateSelector,
+                    clip.metadata.playerTemplateSelector ?? this.playerSelector,
                   )?.innerHTML ?? ''
                 ).trim();
                 const props = {
                   src: clip.media_reference.target,
                   captions: clip.metadata.captionsUrl,
                   ...clip.metadata?.data,
-                  width: this.width ?? 'auto',
-                  height: this.height ?? 'auto',
+                  // width: this.width ?? 'auto',
+                  // height: this.height ?? 'auto',
+                  width: '100%',
+                  height: '100%',
                 };
 
                 template.innerHTML = interpolate(templateString, props);
@@ -449,8 +455,9 @@ export class TimedTextPlayer extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
+    if (!this.transcriptSelector) return;
     // const article = document.getElementById('transcript');
-    const article = document.querySelector(this.transcriptTemplateSelector) as HTMLElement;
+    const article = document.querySelector(this.transcriptSelector) as HTMLElement;
 
     console.log({ article });
 
@@ -625,7 +632,7 @@ export class TimedTextPlayer extends LitElement {
             offset,
             pseudo: !!time,
             pseudoTime: time,
-            transcript: this.transcriptTemplateSelector,
+            transcript: this.transcriptSelector,
             media: section.media_reference.target,
             timedText,
             clip,
