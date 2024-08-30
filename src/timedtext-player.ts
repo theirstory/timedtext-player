@@ -61,6 +61,9 @@ export class TimedTextPlayer extends LitElement {
           video::cue {
             text-wrap: balance;
           }
+          video::-webkit-media-text-track-background {
+            background-color: rgba(255, 0, 0, 0.5);
+          }
         `;
 
   // @property({ type: Number })
@@ -319,13 +322,15 @@ export class TimedTextPlayer extends LitElement {
                   const start = effect.source_range.start_time - clip.source_range.start_time + offset;
                   const end = start + effect.source_range.duration;
                   if (start <= this.time && this.time < end) {
+                    const fadeIn = this.time - start <= 2 ? (this.time - start) / 2 : 1;
+                    // const fadeOut = this.time - start >= effect.source_range.duration - 2 ? (this.time - start)/2 : 1;
                     const progress = (this.time - start) / effect.source_range.duration;
                     const template = document.createElement('template');
                     template.innerHTML = interpolate(
                       (
                         document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? ''
                       ).trim(),
-                      { progress, ...effect.metadata?.data },
+                      { progress, fadeIn, ...effect.metadata?.data },
                     );
                     return { id, children: template.content.childNodes as NodeListOf<HTMLElement> };
                   }
