@@ -185,10 +185,10 @@ export class TimedTextPlayer extends LitElement {
 
   private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
     const { track, duration } = dom2otio(sections) ?? {};
-    if (!track || !duration) return;
 
-    this.track = track;
-    this._duration = duration;
+    this.track = track ?? null;
+    this._duration = duration ?? 0;
+
     this.dispatchEvent(new CustomEvent('durationchange'));
     setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
   }
@@ -238,7 +238,8 @@ export class TimedTextPlayer extends LitElement {
     if (!article) return;
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
     console.log({ sections });
-    if (!sections || sections.length === 0) return;
+    // if (!sections || sections.length === 0) return;
+    // if (!sections) return;
     this._dom2otio(sections);
   }
 
@@ -789,6 +790,10 @@ export class TimedTextPlayer extends LitElement {
       this.playing = false;
       this.dispatchEvent(new CustomEvent('pause'));
     }
+  }
+
+  getCurrentSection() {
+    return this._clipAtTime(this.time).section;
   }
 
   // protected override createRenderRoot() {

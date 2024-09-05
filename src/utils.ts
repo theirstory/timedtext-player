@@ -104,7 +104,7 @@ export function getCaptions(segment: Clip): string {
     const id = `${i}`;
     vttOut += `${id}\n${formatSeconds(first?.marked_range?.start_time)} --> ${formatSeconds(
       last?.marked_range?.start_time + last?.marked_range?.duration,
-    )}\n${text}\n\n`;
+    )} line:85% \n${text}\n\n`;
   });
 
   return vttOut;
