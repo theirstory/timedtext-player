@@ -43,7 +43,7 @@ export function getCaptions(segment: Clip): string {
   }, {} as Record<string, TimedText[]>);
 
   const captions = Object.values(grouped);
-  console.log({ captions });
+  // console.log({ captions });
 
   const captions2 = captions.reduce((acc, g) => {
     const p = g.findIndex(t => t.metadata.pilcrow);
@@ -72,7 +72,7 @@ export function getCaptions(segment: Clip): string {
     return [...acc, prev, g];
   }, [] as (TimedText[] | undefined)[]);
 
-  console.log({ captions2, captions3 });
+  // console.log({ captions2, captions3 });
 
   const formatSeconds = (seconds: number): string =>
     seconds ? new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23) : '00:00:00:000';
@@ -357,11 +357,55 @@ export function dom2otio(
 
   const duration = track.children.reduce((acc, c) => acc + c.source_range.duration, 0);
 
-  console.log({ track, duration });
+  // console.log({ track, duration });
 
   // this.track = track;
   // this._duration = duration;
   // this.dispatchEvent(new CustomEvent('durationchange'));
   // this.textTracks = [new TextTrack(this._players)]
   return { track, duration };
+}
+
+export function findClip(clips: Clip[], sourceTime: number): Clip | null {
+  let left = 0;
+  let right = clips.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    const clip = clips[mid];
+    const start = clip.source_range.start_time;
+    const end = start + clip.source_range.duration;
+
+    if (start <= sourceTime && sourceTime < end) {
+      return clip;
+    } else if (sourceTime < start) {
+      right = mid - 1;
+    } else {
+      left = mid + 1;
+    }
+  }
+
+  return null;
+}
+
+export function findTimedText(timedTexts: TimedText[], sourceTime: number): TimedText | null {
+  let left = 0;
+  let right = timedTexts.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    const tt = timedTexts[mid];
+    const start = tt.marked_range.start_time;
+    const end = start + tt.marked_range.duration;
+
+    if (start <= sourceTime && sourceTime < end) {
+      return tt;
+    } else if (sourceTime < start) {
+      right = mid - 1;
+    } else {
+      left = mid + 1;
+    }
+  }
+
+  return null;
 }
