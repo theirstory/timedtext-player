@@ -692,7 +692,7 @@ export class TimedTextPlayer extends LitElement {
     // TODO emit also source href, such that source pane can be activated and have sync karaoke?
   }
 
-  private _seek(time: number, emitTimeUpdate = false) {
+  private _seek(time: number, _emitTimeUpdate = false) {
     const player = this._playerAtTime(time);
     // console.log('_seek', { time, player, emitTimeUpdate });
     if (!player) return;
@@ -775,7 +775,7 @@ export class TimedTextPlayer extends LitElement {
     }
   }
 
-  private _seekMediaElement(element: HTMLAudioElement | HTMLVideoElement, time: number, label: string) {
+  private _seekMediaElement(element: HTMLAudioElement | HTMLVideoElement, time: number, _label: string) {
     // console.log(`seeking ${label} to ${time}`, element);
     element.currentTime = time;
   }
