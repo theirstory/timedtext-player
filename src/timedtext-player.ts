@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { LitElement, css } from 'lit';
 import { html, unsafeStatic } from 'lit/static-html.js';
-// import { render } from 'lit/html';
 import Hls from 'hls.js';
 import { customElement, state, property, queryAll } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -67,12 +66,6 @@ export class TimedTextPlayer extends LitElement {
           }
         `;
 
-  // @property({ type: Number })
-  // width: number | undefined;
-
-  // @property({ type: Number })
-  // height: number | undefined;
-
   @property({ type: String })
   poster: string | undefined;
 
@@ -108,7 +101,6 @@ export class TimedTextPlayer extends LitElement {
 
   public play() {
     let player = this._currentPlayer();
-    // console.log({ player }, this.currentTime, this.duration);
     if (!player) return;
 
     if (this.duration - this.currentTime < 0.4) {
@@ -271,82 +263,60 @@ export class TimedTextPlayer extends LitElement {
     // }
     // console.log({overlay, clip: this._clip});
 
-    // let size = this.width ? `width: ${this.width}px !important;` : '';
-    // size += this.height ? `height: ${this.height}px !important;` : '';
     const size = 'width: 100%; height: 100%;';
 
     return html`<div style="${size}">
-        ${this.track && this.track.children.length > 0
-          ? repeat(
-              this.track.children,
-              clip => clip.metadata.id,
-              (clip, i) => {
-                const arr = this.track?.children ?? [];
-                const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
-                const duration = clip.source_range.duration;
+      ${this.track && this.track.children.length > 0
+        ? repeat(
+            this.track.children,
+            clip => clip.metadata.id,
+            (clip, i) => {
+              const arr = this.track?.children ?? [];
+              const offset = arr.slice(0, i).reduce((acc, c) => acc + c.source_range.duration, 0);
+              const duration = clip.source_range.duration;
 
-                const template = document.createElement('template');
-                // template.innerHTML = interpolate((document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerSelector)?.innerHTML ?? '').trim(), {
-                //   src: clip.media_reference.target,
-                //   captions: clip.metadata.captionsUrl,
-                //   ...clip.metadata?.data,
-                //   width: this.width ?? 'auto',
-                //   height: this.height ?? 'auto',
-                // });
+              const template = document.createElement('template');
 
-                const templateString = (
-                  document.querySelector<HTMLTemplateElement>(
-                    clip.metadata.playerTemplateSelector ?? this.playerSelector,
-                  )?.innerHTML ?? ''
-                ).trim();
-                const props = {
-                  src: clip.media_reference.target,
-                  captions: clip.metadata.captionsUrl,
-                  ...clip.metadata?.data,
-                  // width: this.width ?? 'auto',
-                  // height: this.height ?? 'auto',
-                  width: '100%',
-                  height: '100%',
-                };
+              const templateString = (
+                document.querySelector<HTMLTemplateElement>(clip.metadata.playerTemplateSelector ?? this.playerSelector)
+                  ?.innerHTML ?? ''
+              ).trim();
+              const props = {
+                src: clip.media_reference.target,
+                captions: clip.metadata.captionsUrl,
+                ...clip.metadata?.data,
+                width: '100%',
+                height: '100%',
+              };
 
-                template.innerHTML = interpolate(templateString, props);
-                // const interpolatedTemplate = new Function('html', 'props', `return html\`${templateString}\`;`)(html, props);
-                // console.log({interpolatedTemplate, templateString, props});
+              template.innerHTML = interpolate(templateString, props);
 
-                // template.innerHTML = interpolatedTemplate;
-                // render(interpolatedTemplate, template);
-                // render(html`<p>Hello</p>`, template);
-                // console.log({ template: template.innerHTML });
+              const node = template.content.childNodes[0] as HTMLElement;
+              const tag = node.nodeName.toLowerCase();
+              const attrs = Array.from(node.attributes).map(
+                attr => `${attr.name}=${attr.value !== '' ? attr.value : '""'}`,
+              );
+              const siblings = Array.from(template.content.childNodes).slice(1);
 
-                const node = template.content.childNodes[0] as HTMLElement;
-                const tag = node.nodeName.toLowerCase();
-                const attrs = Array.from(node.attributes).map(
-                  attr => `${attr.name}=${attr.value !== '' ? attr.value : '""'}`,
-                );
-                const siblings = Array.from(template.content.childNodes).slice(1);
+              const overlays = clip.effects.flatMap(effect => {
+                const id = `${clip.metadata.id}-${effect.metadata.id}`;
+                const start = effect.source_range.start_time - clip.source_range.start_time + offset;
+                const end = start + effect.source_range.duration;
+                if (start <= this.time && this.time < end) {
+                  const fadeIn = this.time - start <= 2 ? (this.time - start) / 2 : 1;
+                  // const fadeOut = this.time - start >= effect.source_range.duration - 2 ? (this.time - start)/2 : 1;
+                  const progress = (this.time - start) / effect.source_range.duration;
+                  const template = document.createElement('template');
+                  template.innerHTML = interpolate(
+                    (document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? '').trim(),
+                    { progress, fadeIn, ...effect.metadata?.data },
+                  );
+                  return { id, children: template.content.childNodes as NodeListOf<HTMLElement> };
+                }
+                return null;
+              });
 
-                const overlays = clip.effects.flatMap(effect => {
-                  const id = `${clip.metadata.id}-${effect.metadata.id}`;
-                  const start = effect.source_range.start_time - clip.source_range.start_time + offset;
-                  const end = start + effect.source_range.duration;
-                  if (start <= this.time && this.time < end) {
-                    const fadeIn = this.time - start <= 2 ? (this.time - start) / 2 : 1;
-                    // const fadeOut = this.time - start >= effect.source_range.duration - 2 ? (this.time - start)/2 : 1;
-                    const progress = (this.time - start) / effect.source_range.duration;
-                    const template = document.createElement('template');
-                    template.innerHTML = interpolate(
-                      (
-                        document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? ''
-                      ).trim(),
-                      { progress, fadeIn, ...effect.metadata?.data },
-                    );
-                    return { id, children: template.content.childNodes as NodeListOf<HTMLElement> };
-                  }
-                  return null;
-                });
-                // console.log({ overlays });
-
-                return html`<div
+              return html`<div
                   class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'}
                   style="${size}"
                 >
@@ -389,12 +359,11 @@ export class TimedTextPlayer extends LitElement {
                     overlay => html`${overlay?.children}`,
                   )}
                 </div>`;
-              },
-            )
-          : html`<video style="${size}" poster="${this.poster ?? ''}"></video>`}
-        ${overlay}
-      </div>
-      <!-- <div style="height: 40px"></div> --> `;
+            },
+          )
+        : html`<video style="${size}" poster="${this.poster ?? ''}"></video>`}
+      ${overlay}
+    </div>`;
   }
 
   private _hls() {
@@ -444,19 +413,14 @@ export class TimedTextPlayer extends LitElement {
 
   private _ready() {
     // this.dispatchEvent(new CustomEvent('ready'));
-    // console.log('ready');
     const url = new URL(window.location.href);
     const t = url.searchParams.get('t');
-
-    // console.log({ t });
 
     if (t) {
       const [start, end] = t.split(',').map(v => parseFloat(v));
 
       this._start = start;
       this._end = end;
-
-      // console.log({ _start: this._start, _end: this._end });
 
       setTimeout(() => {
         this._seek(start);
@@ -497,15 +461,12 @@ export class TimedTextPlayer extends LitElement {
     // const article = document.getElementById('transcript');
     const article = document.querySelector(this.transcriptSelector) as HTMLElement;
 
-    // console.log({ article });
-
     // TODO: create observers per section.
     if (!article) return;
     this._observer = new MutationObserver(this.callback.bind(this));
     this._observer.observe(article, { attributes: true, childList: true, subtree: true });
 
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    // console.log({ sections });
     this._dom2otio(sections);
 
     article.addEventListener('click', this._transcriptClick.bind(this));
@@ -517,7 +478,6 @@ export class TimedTextPlayer extends LitElement {
 
     let element = target;
 
-    // console.log({ target });
     // FIXME use closest as limit to go up and look down
     if (!element.getAttribute('data-t')) {
       element = element.querySelector('[data-t]') as HTMLElement;
@@ -531,7 +491,6 @@ export class TimedTextPlayer extends LitElement {
     if (!element) {
       element = target.parentElement?.parentElement?.parentElement?.querySelector('[data-t]') as HTMLElement;
     }
-    // console.log({ element });
 
     // if (element?.nodeName !== 'SPAN') return;
     if (!element.getAttribute('data-t')) return;
@@ -539,18 +498,13 @@ export class TimedTextPlayer extends LitElement {
     // const sectionElement = element.parentElement?.parentElement;
     const sectionElement = element.closest('section'); // this.parents(element, 'section')[0];
 
-    // console.log({sectionElement});
-
     const section = this.track?.children.find(c => c.metadata.element === sectionElement);
 
-    // console.log({ section });
     if (!section) return;
 
     const sectionIndex = this.track?.children.indexOf(section);
     const offset =
       this.track?.children.slice(0, sectionIndex).reduce((acc, c) => acc + c.source_range.duration, 0) ?? 0;
-
-    // console.log({ sectionIndex, offset });
 
     let start;
     if (element.getAttribute('data-t')) {
@@ -564,8 +518,6 @@ export class TimedTextPlayer extends LitElement {
     // TODO randomise that 0.02
     const time =
       start - section.source_range.start_time + offset + (start === section.source_range.start_time ? 0.02 : 0);
-
-    // console.log(time);
 
     this._seek(time);
   }
@@ -635,7 +587,6 @@ export class TimedTextPlayer extends LitElement {
     const altTimedText = findTimedText([...(clip?.timed_texts ?? [])].reverse(), sourceTime);
 
     if (!timedText && altTimedText) {
-      // console.log({time, offset, sourceTime, altTimedText});
       timedText = altTimedText;
     }
 
@@ -694,7 +645,6 @@ export class TimedTextPlayer extends LitElement {
 
   private _seek(time: number, _emitTimeUpdate = false) {
     const player = this._playerAtTime(time);
-    // console.log('_seek', { time, player, emitTimeUpdate });
     if (!player) return;
 
     const currentPlayer = this._currentPlayer();
@@ -776,7 +726,6 @@ export class TimedTextPlayer extends LitElement {
   }
 
   private _seekMediaElement(element: HTMLAudioElement | HTMLVideoElement, time: number, _label: string) {
-    // console.log(`seeking ${label} to ${time}`, element);
     element.currentTime = time;
   }
 
