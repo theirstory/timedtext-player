@@ -1,0 +1,28 @@
+html,
+body {
+  font-family: -apple-system, BlinkMacSystemFont, avenir next, avenir, segoe ui, helvetica neue, helvetica, Cantarell,
+    Ubuntu, roboto, noto, arial, sans-serif;
+}
+
+body {
+  > header,
+  > footer,
+  > main {
+    width: 33em; /* https://webtypography.net/2.1.2 */
+    text-align: left;
+    margin: 0 auto;
+  }
+}
+
+body > header nav ul {
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+body > header nav ul li:last-child {
+  margin-right: 0;
+}
