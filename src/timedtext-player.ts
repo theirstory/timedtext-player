@@ -372,8 +372,12 @@ export class TimedTextPlayer extends LitElement {
     players.forEach((player: any) => {
       if (player.nodeName === 'VIDEO') {
         const video = player as HTMLVideoElement;
-        if (Hls.isSupported() && video.src.endsWith('.m3u8')) {
+        console.log('video src?', video.src);
+        if (Hls.isSupported() && (video.src.endsWith('.m3u8') || video.src.startsWith('data:'))) {
           const hls = new Hls();
+          hls.on(Hls.Events.ERROR, function (event, data) {
+            console.error('HLS error', event, data);
+          });
           hls.loadSource(video.src);
           hls.attachMedia(video);
           // hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -493,7 +497,7 @@ export class TimedTextPlayer extends LitElement {
     }
 
     // if (element?.nodeName !== 'SPAN') return;
-    if (!element.getAttribute('data-t')) return;
+    if (!element?.getAttribute('data-t')) return;
 
     // const sectionElement = element.parentElement?.parentElement;
     const sectionElement = element.closest('section'); // this.parents(element, 'section')[0];
