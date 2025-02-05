@@ -130,6 +130,12 @@ export function dom2otio(
         const src = s.getAttribute('data-media-src');
         const id = s.getAttribute('id') ?? generateSecureUniqueId();
         const [start, end] = (s.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
+        let metadata = {};
+        try {
+          metadata = JSON.parse(s.getAttribute('data-metadata') ?? '{}');
+        } catch (ignored) {
+          /* */
+        }
 
         const children: NodeListOf<HTMLElement> | undefined = s.querySelectorAll(
           'p[data-t]:not(*[data-effect]), div[data-t]:not(*[data-effect])',
@@ -149,6 +155,7 @@ export function dom2otio(
             target: src,
           },
           metadata: {
+            ...metadata,
             id,
             element: s,
             selector: finder(s, { root: s.parentElement as HTMLElement }),
@@ -172,6 +179,13 @@ export function dom2otio(
                 text,
               }));
 
+              let metadata2 = {};
+              try {
+                metadata2 = JSON.parse(c.getAttribute('data-metadata') ?? '{}');
+              } catch (ignored) {
+                /* */
+              }
+
               return {
                 OTIO_SCHEMA: 'Clip.1',
                 source_range: {
@@ -183,6 +197,8 @@ export function dom2otio(
                   target: src,
                 },
                 metadata: {
+                  ...metadata,
+                  ...metadata2,
                   element: c,
                   transcript: c.textContent,
                   selector: finder(c, { root: s.parentElement as HTMLElement }),

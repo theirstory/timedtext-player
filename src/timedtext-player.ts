@@ -74,7 +74,7 @@ export class TimedTextPlayer extends LitElement {
 
   set currentTime(time: number) {
     // console.log({ setCurrentTime: time });
-    this._seek(time);
+    this._seek(time, false, 'setCurrentTime');
     // cancel end
     this._end = this._duration;
   }
@@ -84,6 +84,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   set currentPseudoTime(time: number) {
+    console.log({ currentPseudoTime: time });
     this._dispatchTimedTextEvent(time);
   }
 
@@ -105,7 +106,7 @@ export class TimedTextPlayer extends LitElement {
 
     if (this.duration - this.currentTime < 0.4) {
       // FIXME
-      this._seek(0);
+      this._seek(0, false, 'play()');
       player = this._playerAtTime(0);
       player!.play();
     } else {
@@ -181,14 +182,24 @@ export class TimedTextPlayer extends LitElement {
     return this._playersEventsCounter.get(player);
   }
 
-  private _dom2otio(sections: NodeListOf<HTMLElement> | undefined) {
+  // time to seek on load
+  // targetTime = 0;
+
+  private _dom2otio(sections: NodeListOf<HTMLElement> | undefined, targetTime = 0) {
     const { track, duration } = dom2otio(sections) ?? {};
+    console.log('_dom2otio', targetTime);
 
     this.track = track ?? null;
+    if (this._duration !== duration || targetTime !== 0) {
+      setTimeout(() => {
+        this._seek(targetTime === 0 ? 0.1 : targetTime, true, '_dom2otio()');
+        // this.targetTime = 0;
+      }, 800);
+    }
     this._duration = duration ?? 0;
 
     this.dispatchEvent(new CustomEvent('durationchange'));
-    setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
+    // setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
   }
 
   @property({ type: String, attribute: 'pause-mutation-observer' })
@@ -242,6 +253,24 @@ export class TimedTextPlayer extends LitElement {
   }
 
   _observer: MutationObserver | undefined = undefined;
+
+  // TODO this is more or less processTranscript?
+  public reloadRemix(time = 0) {
+    this._reloadRemix(time);
+  }
+
+  private _reloadRemix(time = 0) {
+    if (!this.transcriptSelector) return;
+    // this.targetTime = time;
+    console.log('remixChange?', time);
+    // const article = document.getElementById('transcript');
+    const article = document.querySelector(this.transcriptSelector) as HTMLElement;
+
+    // TODO: create observers per section.
+    if (!article) return;
+    const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
+    this._dom2otio(sections, time);
+  }
 
   // TODO transcriptSelector property
 
@@ -349,7 +378,7 @@ export class TimedTextPlayer extends LitElement {
                     @error=${this._relayEvent}
                     @volumechange=${this._relayEvent}
                   >
-                    <track default kind="captions" srclang="en" src="${clip.metadata.captionsUrl}" />
+                    <track _default kind="captions" srclang="en" src="${clip.metadata.captionsUrl}" />
                     ${node.children}
                   </${unsafeStatic(tag)}>
                   ${siblings}
@@ -402,11 +431,12 @@ export class TimedTextPlayer extends LitElement {
     } else {
       this._playersEventsCounter.set(e.target as HTMLMediaElement, { [e.type]: 1 });
     }
+    // this._relayEvent(e);
   }
 
   private _relayEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
-    this._countEvent(e);
-    // console.log(e.type);
+    // this._countEvent(e);
+    console.log(e.type);
     // TODO whitelist what events to relay
     // TODO emit only current player events?
     this.dispatchEvent(new CustomEvent(e.type));
@@ -427,7 +457,7 @@ export class TimedTextPlayer extends LitElement {
       this._end = end;
 
       setTimeout(() => {
-        this._seek(start);
+        this._seek(start, false, '_ready()');
         setTimeout(() => this._playerAtTime(start)?.play(), 1000);
       }, 1000);
     } else {
@@ -474,6 +504,8 @@ export class TimedTextPlayer extends LitElement {
     this._dom2otio(sections);
 
     article.addEventListener('click', this._transcriptClick.bind(this));
+
+    // this.addEventListener('remixChange', this._reloadRemix.bind(this));
   }
 
   private _transcriptClick(e: MouseEvent) {
@@ -497,7 +529,7 @@ export class TimedTextPlayer extends LitElement {
     }
 
     // if (element?.nodeName !== 'SPAN') return;
-    if (!element?.getAttribute('data-t')) return;
+    if (!element || !element?.getAttribute('data-t')) return;
 
     // const sectionElement = element.parentElement?.parentElement;
     const sectionElement = element.closest('section'); // this.parents(element, 'section')[0];
@@ -523,7 +555,8 @@ export class TimedTextPlayer extends LitElement {
     const time =
       start - section.source_range.start_time + offset + (start === section.source_range.start_time ? 0.02 : 0);
 
-    this._seek(time);
+    this.currentPseudoTime = time;
+    this._seek(time, false, '_transcriptClick()');
   }
 
   private _playerAtTime(time: number): HTMLMediaElement | undefined {
@@ -647,10 +680,11 @@ export class TimedTextPlayer extends LitElement {
     // TODO emit also source href, such that source pane can be activated and have sync karaoke?
   }
 
-  private _seek(time: number, _emitTimeUpdate = false) {
+  private _seek(time: number, _emitTimeUpdate = false, message: string) {
     const player = this._playerAtTime(time);
     if (!player) return;
 
+    if (message) console.log('SEEK', time, message);
     const currentPlayer = this._currentPlayer();
 
     const [start] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
