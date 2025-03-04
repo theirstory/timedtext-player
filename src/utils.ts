@@ -119,7 +119,10 @@ export function generateSecureUniqueId(length = 16): string {
 export function dom2otio(
   sections: NodeListOf<HTMLElement> | undefined,
 ): { track: Track; duration: number } | undefined {
-  if (!sections) return;
+  if (!sections) {
+    console.log('No sections found');
+    return;
+  }
 
   const track = {
     OTIO_SCHEMA: 'Track.1',

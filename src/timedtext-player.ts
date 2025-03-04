@@ -200,6 +200,7 @@ export class TimedTextPlayer extends LitElement {
 
     this.dispatchEvent(new CustomEvent('durationchange'));
     // setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
+    return { track, duration };
   }
 
   @property({ type: String, attribute: 'pause-mutation-observer' })
@@ -256,20 +257,26 @@ export class TimedTextPlayer extends LitElement {
 
   // TODO this is more or less processTranscript?
   public reloadRemix(time = 0) {
-    this._reloadRemix(time);
+    return this._reloadRemix(time);
   }
 
   private _reloadRemix(time = 0) {
-    if (!this.transcriptSelector) return;
+    if (!this.transcriptSelector) {
+      console.log('no transcriptSelector');
+      return null;
+    }
     // this.targetTime = time;
     console.log('remixChange?', time);
     // const article = document.getElementById('transcript');
     const article = document.querySelector(this.transcriptSelector) as HTMLElement;
 
     // TODO: create observers per section.
-    if (!article) return;
+    if (!article) {
+      console.log('no article');
+      return null;
+    }
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    this._dom2otio(sections, time);
+    return this._dom2otio(sections, time);
   }
 
   // TODO transcriptSelector property
