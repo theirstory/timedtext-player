@@ -352,8 +352,20 @@ export class TimedTextPlayer extends LitElement {
                 return null;
               });
 
+              let active = offset <= this.time && this.time < offset + duration;
+
+              // ensure last video is active if time is past duration
+              if (
+                !active &&
+                this?.track?.children &&
+                i === this.track.children.length - 1 &&
+                this.time >= offset + duration
+              ) {
+                active = true;
+              }
+
               return html`<div
-                  class=${offset <= this.time && this.time < offset + duration ? 'active wrapper' : 'wrapper'}
+                  class=${active ? 'active wrapper' : 'wrapper'}
                   style="${size}"
                 >
                   <${unsafeStatic(tag)}
