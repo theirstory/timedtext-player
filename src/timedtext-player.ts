@@ -568,11 +568,13 @@ export class TimedTextPlayer extends LitElement {
 
   private _playerAtTime(time: number): HTMLMediaElement | undefined {
     const players = Array.from(this._players);
-    return players.find(p => {
-      const [start, end] = (p.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
-      const offset = parseFloat(p.getAttribute('data-offset') ?? '0');
-      return start <= time - offset + start && time - offset + start <= end;
-    });
+    return (
+      players.find(p => {
+        const [start, end] = (p.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
+        const offset = parseFloat(p.getAttribute('data-offset') ?? '0');
+        return start <= time - offset + start && time - offset + start <= end;
+      }) ?? (players.length > 0 ? players[players.length - 1] : undefined)
+    );
   }
 
   private _currentPlayer(): HTMLMediaElement | undefined {
