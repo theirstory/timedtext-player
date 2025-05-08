@@ -168,7 +168,31 @@ export class TimedTextPlayer extends LitElement {
   //   return this._playersReady.includes(player);
   // }
 
-  // textTracks: TextTrack[] = [];
+  _applyTextTracksTimeout: number | undefined = undefined;
+
+  get textTracks() {
+    console.log('get textTracks');
+    clearTimeout(this._applyTextTracksTimeout);
+    this._applyTextTracksTimeout = setTimeout(() => {
+      this.applyTextTracks();
+    }, 250);
+    return this._players?.[0]?.textTracks ?? [];
+  }
+
+  applyTextTracks() {
+    console.log('setTextTracks', this._players);
+    const firstPlayer = this._players[0];
+    if (!firstPlayer) return;
+
+    const mode = firstPlayer.textTracks[0]?.mode ?? 'hidden';
+
+    this._players.forEach(player => {
+      const textTracks = Array.from(player.textTracks);
+      textTracks.forEach(track => {
+        track.mode = mode;
+      });
+    });
+  }
 
   _playersEventsCounter: Map<HTMLMediaElement, Record<string, number>> = new Map();
 
