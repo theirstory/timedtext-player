@@ -164,11 +164,15 @@ export class TimedTextPlayer extends LitElement {
 
   _playersReady: HTMLMediaElement[] = [];
 
+  @queryAll('video')
+  _videos!: NodeListOf<HTMLVideoElement>;
+
   // private isPlayerReady(player: HTMLMediaElement) {
   //   return this._playersReady.includes(player);
   // }
 
   _applyTextTracksTimeout: number | undefined = undefined;
+  _textTracks: TextTrackList | undefined = undefined;
 
   get textTracks() {
     console.log('get textTracks');
@@ -176,7 +180,21 @@ export class TimedTextPlayer extends LitElement {
     this._applyTextTracksTimeout = setTimeout(() => {
       this.applyTextTracks();
     }, 250);
-    return this._players?.[0]?.textTracks ?? [];
+    // return this._players?.[0]?.textTracks ?? new TextTrackList();
+    if (this._players?.[0]?.textTracks) {
+      this._textTracks = this._players[0].textTracks;
+    } else if (this._videos?.[0]?.textTracks) {
+      this._textTracks = this._videos[0].textTracks;
+    }
+    return this._textTracks ?? ([] as any as TextTrackList);
+  }
+
+  set textTracks(textTracks: TextTrackList) {
+    this._textTracks = textTracks;
+    clearTimeout(this._applyTextTracksTimeout);
+    this._applyTextTracksTimeout = setTimeout(() => {
+      this.applyTextTracks();
+    }, 250);
   }
 
   applyTextTracks() {

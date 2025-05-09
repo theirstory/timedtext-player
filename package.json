@@ -1,6 +1,6 @@
 {
   "name": "@theirstoryinc/timedtext-player",
-  "version": "0.0.18",
+  "version": "0.0.21",
   "description": "Timed Text player web component",
   "main": "dist/timedtext-player.js",
   "module": "dist/timedtext-player.js",
@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "clean": "rimraf dist/timedtext-player.{d.ts,d.ts.map,js,js.map} dist/test/timedtext-player.{d.ts,d.ts.map,js,js.map} dist/test/timedtext-player_test.{d.ts,d.ts.map,js,js.map}",
+    "clean": "rimraf dist/*",
     "lint": "npm run lint:lit-analyzer && npm run lint:eslint",
     "lint:eslint": "eslint 'src/**/*.ts'",
     "lint:lit-analyzer": "lit-analyzer",
