@@ -4,6 +4,8 @@ import { finder } from '@medv/finder';
 
 import { Clip, TimedText, Track, Gap, Effect } from './interfaces';
 
+import { annotateTokens, generateVTT, type Token, type TokenMetadata } from 'timedtext-vtt';
+
 function escapeHTML(str: string): string {
   const escapeChars: { [key: string]: string } = {
     '&': '&amp;',
@@ -32,80 +34,97 @@ export function getOffset(element: HTMLElement): number {
 export function getCaptions(segment: Clip): string {
   const clips = segment.children;
   const timedTexts = clips.flatMap(c => c.timed_texts ?? []);
-  const grouped = timedTexts.reduce((acc, obj) => {
-    // Initialize the sub-array for the group if it doesn't exist
-    if (!acc[obj.metadata.captionGroup]) {
-      acc[obj.metadata.captionGroup] = [];
-    }
-    // Append the object to the correct group
-    acc[obj.metadata.captionGroup].push(obj);
-    return acc;
-  }, {} as Record<string, TimedText[]>);
+  console.log({ clips, timedTexts });
 
-  const captions = Object.values(grouped);
+  const tokens: Token[] = timedTexts.map(
+    ({ texts: text, marked_range: { start_time, duration } }) =>
+      ({
+        text: text ?? '',
+        start: start_time,
+        duration,
+        metadata: {} as TokenMetadata,
+      } as Token),
+  );
+
+  console.log({ tokens });
+
+  const annotatedTokens = annotateTokens(tokens);
+  const vttOut = generateVTT([annotatedTokens], true);
+
+  // const grouped = timedTexts.reduce((acc, obj) => {
+  //   // Initialize the sub-array for the group if it doesn't exist
+  //   if (!acc[obj.metadata.captionGroup]) {
+  //     acc[obj.metadata.captionGroup] = [];
+  //   }
+  //   // Append the object to the correct group
+  //   acc[obj.metadata.captionGroup].push(obj);
+  //   return acc;
+  // }, {} as Record<string, TimedText[]>);
+
+  // const captions = Object.values(grouped);
   // console.log({ captions });
 
-  const captions2 = captions.reduce((acc, g) => {
-    const p = g.findIndex(t => t.metadata.pilcrow);
-    const p0 = g.findIndex(t => t.metadata.pilcrow0);
+  // const captions2 = captions.reduce((acc, g) => {
+  //   const p = g.findIndex(t => t.metadata.pilcrow);
+  //   const p0 = g.findIndex(t => t.metadata.pilcrow0);
 
-    if (p0 < p) {
-      const tail = g.slice(p0 + 1);
-      tail[tail.length - 1].metadata.glue = true;
-      tail[tail.length - 1].metadata.pilcrow = false;
-      tail[tail.length - 1].metadata.pilcrow4 = true;
-      return [...acc, g.slice(0, p0 + 1), tail];
-    }
-    // default
-    return [...acc, g];
-  }, [] as TimedText[][]);
+  //   if (p0 < p) {
+  //     const tail = g.slice(p0 + 1);
+  //     tail[tail.length - 1].metadata.glue = true;
+  //     tail[tail.length - 1].metadata.pilcrow = false;
+  //     tail[tail.length - 1].metadata.pilcrow4 = true;
+  //     return [...acc, g.slice(0, p0 + 1), tail];
+  //   }
+  //   // default
+  //   return [...acc, g];
+  // }, [] as TimedText[][]);
 
-  const captions3 = captions2.reduce((acc, g, i) => {
-    if (i === 0) return [...acc, g];
-    const prev = acc.pop();
+  // const captions3 = captions2.reduce((acc, g, i) => {
+  //   if (i === 0) return [...acc, g];
+  //   const prev = acc.pop();
 
-    if (prev && prev[prev.length - 1]?.metadata?.glue) {
-      return [...acc, [...prev, ...g]];
-    }
+  //   if (prev && prev[prev.length - 1]?.metadata?.glue) {
+  //     return [...acc, [...prev, ...g]];
+  //   }
 
-    // default
-    return [...acc, prev, g];
-  }, [] as (TimedText[] | undefined)[]);
+  //   // default
+  //   return [...acc, prev, g];
+  // }, [] as (TimedText[] | undefined)[]);
 
   // console.log({ captions2, captions3 });
 
-  const formatSeconds = (seconds: number): string =>
-    seconds ? new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23) : '00:00:00:000';
+  // const formatSeconds = (seconds: number): string =>
+  //   seconds ? new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23) : '00:00:00:000';
 
-  let vttOut = [
-    'WEBVTT',
-    '',
-    'Kind: captions',
-    'Language: en-US', // TODO lift language from transcript?
-    '',
-    '',
-  ].join('\n');
+  // let vttOut = [
+  //   'WEBVTT',
+  //   '',
+  //   'Kind: captions',
+  //   'Language: en-US', // TODO lift language from transcript?
+  //   '',
+  //   '',
+  // ].join('\n');
 
-  (captions3 as any).forEach((tt: TimedText[], i: number) => {
-    const first = tt[0];
-    const last = tt[tt.length - 1];
-    // let text = tt.map(t => t.texts)
-    const text = tt
-      .map(
-        t => `<${formatSeconds(t.marked_range.start_time)}>` + t.metadata.ruby,
-        // + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')
-        // + (t.metadata.pilcrow0 ? '<c.yellow>◊</c>' : '')
-        // + (t.metadata.pilcrow2 ? '<c.yellow>†</c>' : '')
-        // + (t.metadata.pilcrow3 ? '<c.yellow>‡</c>' : '')
-        // + (t.metadata.pilcrow4 ? '<c.yellow>⌑</c>' : '')
-      )
-      .join(' ');
-    // const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + (t.metadata.pilcrow2 ? '<c.yellow>*</c>' : '')).join(' ');
-    const id = `${i}`;
-    vttOut += `${id}\n${formatSeconds(first?.marked_range?.start_time)} --> ${formatSeconds(
-      last?.marked_range?.start_time + last?.marked_range?.duration,
-    )} line:85% \n${text}\n\n`;
-  });
+  // (captions3 as any).forEach((tt: TimedText[], i: number) => {
+  //   const first = tt[0];
+  //   const last = tt[tt.length - 1];
+  //   // let text = tt.map(t => t.texts)
+  //   const text = tt
+  //     .map(
+  //       t => `<${formatSeconds(t.marked_range.start_time)}>` + t.metadata.ruby,
+  //       // + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '')
+  //       // + (t.metadata.pilcrow0 ? '<c.yellow>◊</c>' : '')
+  //       // + (t.metadata.pilcrow2 ? '<c.yellow>†</c>' : '')
+  //       // + (t.metadata.pilcrow3 ? '<c.yellow>‡</c>' : '')
+  //       // + (t.metadata.pilcrow4 ? '<c.yellow>⌑</c>' : '')
+  //     )
+  //     .join(' ');
+  //   // const text = tt.map((t) => `<${formatSeconds(t.marked_range.start_time)}>` + '<c>' + t.texts + '</c>' + (t.metadata.pilcrow ? '<c.yellow>¶</c>' : '') + (t.metadata.pilcrow2 ? '<c.yellow>*</c>' : '')).join(' ');
+  //   const id = `${i}`;
+  //   vttOut += `${id}\n${formatSeconds(first?.marked_range?.start_time)} --> ${formatSeconds(
+  //     last?.marked_range?.start_time + last?.marked_range?.duration,
+  //   )} line:85% \n${text}\n\n`;
+  // });
 
   return vttOut;
 }

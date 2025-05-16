@@ -181,9 +181,8 @@ export class TimedTextPlayer extends LitElement {
       this.applyTextTracks();
     }, 250);
     // return this._players?.[0]?.textTracks ?? new TextTrackList();
-    if (this._players?.[0]?.textTracks) {
-      this._textTracks = this._players[0].textTracks;
-    } else if (this._videos?.[0]?.textTracks) {
+
+    if (this._videos?.[0]?.textTracks) {
       this._textTracks = this._videos[0].textTracks;
     }
     return this._textTracks ?? ([] as any as TextTrackList);
@@ -199,10 +198,10 @@ export class TimedTextPlayer extends LitElement {
 
   applyTextTracks() {
     console.log('setTextTracks', this._players);
-    const firstPlayer = this._players[0];
-    if (!firstPlayer) return;
+    const firstVideo = this._videos[0];
+    if (!firstVideo) return;
 
-    const mode = firstPlayer.textTracks[0]?.mode ?? 'hidden';
+    const mode = firstVideo.textTracks[0]?.mode ?? 'hidden';
 
     this._players.forEach(player => {
       const textTracks = Array.from(player.textTracks);
@@ -344,6 +343,9 @@ export class TimedTextPlayer extends LitElement {
     const size = 'width: 100%; height: 100%;';
 
     return html`<div style="${size}">
+      <video style="display: none;">
+        <track kind="captions" srclang="en" src="data:text/vtt;base64,V0VCVlRUCgoK" />
+      </video>
       ${this.track && this.track.children.length > 0
         ? repeat(
             this.track.children,
