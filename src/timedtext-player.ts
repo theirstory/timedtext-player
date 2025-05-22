@@ -6,7 +6,7 @@ import Hls from 'hls.js';
 import { customElement, state, property, queryAll } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import { interpolate, dom2otio, findClip, findTimedText } from './utils';
+import { interpolate, dom2otio, findClip, findTimedText, stripTags } from './utils';
 import { Track } from './interfaces';
 
 @customElement('timedtext-player')
@@ -202,6 +202,7 @@ export class TimedTextPlayer extends LitElement {
     if (!firstVideo) return;
 
     const mode = firstVideo.textTracks[0]?.mode ?? 'hidden';
+    if (mode !== 'showing') this._currentCue = null;
 
     this._players.forEach(player => {
       const textTracks = Array.from(player.textTracks);
@@ -389,7 +390,12 @@ export class TimedTextPlayer extends LitElement {
                   const template = document.createElement('template');
                   template.innerHTML = interpolate(
                     (document.querySelector<HTMLTemplateElement>(effect.metadata.data.effect)?.innerHTML ?? '').trim(),
-                    { progress, fadeIn, ...effect.metadata?.data },
+                    {
+                      progress,
+                      fadeIn,
+                      ...effect.metadata?.data,
+                      cue: stripTags(this._currentCue?.text ?? ''),
+                    },
                   );
                   return { id, children: template.content.childNodes as NodeListOf<HTMLElement> };
                 }
@@ -441,7 +447,12 @@ export class TimedTextPlayer extends LitElement {
                     @error=${this._relayEvent}
                     @volumechange=${this._relayEvent}
                   >
-                    <track _default kind="captions" srclang="en" src="${clip.metadata.captionsUrl}" />
+                    <track
+                      kind="captions"
+                      srclang="en"
+                      src="${clip.metadata.captionsUrl}"
+                      @cuechange=${this._cueChange}
+                    />
                     ${node.children}
                   </${unsafeStatic(tag)}>
                   ${siblings}
@@ -456,6 +467,36 @@ export class TimedTextPlayer extends LitElement {
         : html`<video style="${size}" poster="${this.poster ?? ''}"></video>`}
       ${overlay}
     </div>`;
+  }
+
+  @state()
+  _currentCue: VTTCue | null = null;
+
+  private _cueChange(e: Event & { target: HTMLTrackElement }) {
+    const track = e.target as HTMLTrackElement;
+    const currentPlayer = this._currentPlayer();
+
+    if (!currentPlayer) return;
+    if (currentPlayer !== track.parentElement) return;
+
+    const cues = track.track?.activeCues ?? [];
+    if (cues.length > 0) {
+      if (cues.length > 1) {
+        console.warn('multiple cues', cues);
+      }
+      const cue = cues[0];
+      if (this._currentCue !== cue) {
+        this._currentCue = cue as VTTCue;
+        // console.log('cueChange', cue);
+        this.dispatchEvent(
+          new CustomEvent('cuechange', {
+            detail: { cue },
+          }),
+        );
+      }
+    } else {
+      this._currentCue = null;
+    }
   }
 
   private _hls() {

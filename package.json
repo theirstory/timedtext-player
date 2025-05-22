@@ -1,6 +1,6 @@
 {
   "name": "@theirstoryinc/timedtext-player",
-  "version": "0.0.25",
+  "version": "0.0.29",
   "description": "Timed Text player web component",
   "main": "dist/timedtext-player.js",
   "module": "dist/timedtext-player.js",
@@ -37,7 +37,7 @@
     "@medv/finder": "^3.2.0",
     "hls.js": "1.5.16",
     "lit": "^3.2.0",
-    "timedtext-vtt": "^0.1.4"
+    "timedtext-vtt": "0.1.4"
   },
   "devDependencies": {
     "@custom-elements-manifest/analyzer": "^0.6.3",

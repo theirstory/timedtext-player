@@ -6,7 +6,8 @@
     <title>&lt;timedtext-player> Demo</title>
     <script src="../node_modules/@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
     <script src="../node_modules/lit/polyfill-support.js"></script>
-    <script type="module" src="../dist/timedtext-player.js"></script>
+    <!-- <script type="module" src="../dist/timedtext-player.js"></script> -->
+    <script type="module" src="../dist/timedtext-player.bundled.js"></script>
     <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/media-chrome@4/+esm"></script> -->
     <script type="module">
       import mediaChrome from 'https://cdn.jsdelivr.net/npm/media-chrome@4.9.1/+esm';
@@ -147,7 +148,8 @@
 
     <template id="overlay">
       <div style="position: absolute; top: 0; left: 0">
-        <h2 style="color: yellow; background-color: rgba(0, 0, 0, 0.3)">${text}</h2>
+        <h2 style="color: yellow; background-color: rgba(0, 0, 0, 0.3)">${text}?</h2>
+        <h4 style="color: white; text-align: center; margin-top: 30%">${cue}</h4>
         <!-- <p>${progress}</p> -->
       </div>
     </template>
@@ -156,6 +158,7 @@
       <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7)">
         <h2 style="color: white; text-align: center; margin-top: 30%">${title}</h2>
         <h3 style="color: white; text-align: center; margin-top: 30%">${subtitle}</h3>
+        <h4 style="color: white; text-align: center; margin-top: 30%">${cue}</h4>
       </div>
     </template>
 

@@ -447,3 +447,7 @@ export function findTimedText(timedTexts: TimedText[], sourceTime: number): Time
 
   return null;
 }
+
+export function stripTags(str: string): string {
+  return str.replace(/<\/?[^>]+(>|$)/g, '');
+}
