@@ -143,6 +143,8 @@ export function dom2otio(
     return;
   }
 
+  // console.log('sections', sections);
+
   const track = {
     OTIO_SCHEMA: 'Track.1',
     name: 'Transcript',
@@ -164,7 +166,7 @@ export function dom2otio(
         );
         const effects: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('div[data-t][data-effect]');
 
-        // console.log('TRACK', {src, id, start, end, children, effects});
+        // console.log('TRACK', { src, id, start, end, children, effects });
 
         return {
           OTIO_SCHEMA: 'Clip.1', // TODO: verify with OTIO spec, should be Composable?

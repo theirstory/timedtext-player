@@ -76,7 +76,8 @@ export class TimedTextPlayer extends LitElement {
     // console.log({ setCurrentTime: time });
     this._seek(time, false, 'setCurrentTime');
     // cancel end
-    this._end = this._duration;
+    // console.log('cancel end', this._end, this._duration);
+    // this._end = this._duration;
   }
 
   get currentTime() {
@@ -115,11 +116,15 @@ export class TimedTextPlayer extends LitElement {
     // pause any other players in the document
     const players = Array.from(document.querySelectorAll('timedtext-player'));
     players.forEach(p => {
-      if (p !== this) p.pause();
+      if (p !== this) {
+        console.log('pause other players', p);
+        p.pause();
+      }
     });
   }
 
   public pause() {
+    console.log('pause from timedtext-player');
     const player = this._currentPlayer();
     if (!player) return;
     player.pause();
@@ -240,6 +245,7 @@ export class TimedTextPlayer extends LitElement {
     }
     this._duration = duration ?? 0;
 
+    console.log('dispatch durationchange', { track, duration });
     this.dispatchEvent(new CustomEvent('durationchange'));
     // setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
     return { track, duration };
@@ -446,6 +452,7 @@ export class TimedTextPlayer extends LitElement {
                     @waiting=${this._relayEvent}
                     @error=${this._relayEvent}
                     @volumechange=${this._relayEvent}
+                    @stalled=${this._relayEvent}
                   >
                     <track
                       kind="captions"
@@ -488,6 +495,7 @@ export class TimedTextPlayer extends LitElement {
       if (this._currentCue !== cue) {
         this._currentCue = cue as VTTCue;
         // console.log('cueChange', cue);
+        console.log('dispatch cuechange', cue);
         this.dispatchEvent(
           new CustomEvent('cuechange', {
             detail: { cue },
@@ -540,33 +548,30 @@ export class TimedTextPlayer extends LitElement {
 
   private _relayEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     // this._countEvent(e);
-    console.log(e.type);
+    console.log('relay event', e.type, e);
     // TODO whitelist what events to relay
     // TODO emit only current player events?
     this.dispatchEvent(new CustomEvent(e.type));
   }
 
   _start = 0;
-  _end = 0;
+  // _end = 0;
 
   private _ready() {
     // this.dispatchEvent(new CustomEvent('ready'));
-    const url = new URL(window.location.href);
-    const t = url.searchParams.get('t');
-
-    if (t) {
-      const [start, end] = t.split(',').map(v => parseFloat(v));
-
-      this._start = start;
-      this._end = end;
-
-      setTimeout(() => {
-        this._seek(start, false, '_ready()');
-        setTimeout(() => this._playerAtTime(start)?.play(), 1000);
-      }, 1000);
-    } else {
-      this._end = this._duration;
-    }
+    // const url = new URL(window.location.href);
+    // const t = url.searchParams.get('t');
+    // if (t) {
+    //   const [start, end] = t.split(',').map(v => parseFloat(v));
+    //   this._start = start;
+    //   this._end = end;
+    //   setTimeout(() => {
+    //     this._seek(start, false, '_ready()');
+    //     setTimeout(() => this._playerAtTime(start)?.play(), 1000);
+    //   }, 1000);
+    // } else {
+    //   this._end = this._duration;
+    // }
   }
 
   private _onLoadedMetadata(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
@@ -760,6 +765,7 @@ export class TimedTextPlayer extends LitElement {
     // if (this._timedText !== timedText) {
     // if (this._timedTextTime !== time && this.time) {
     if (this.time) {
+      console.log('dispatch playhead');
       this.dispatchEvent(
         new CustomEvent('playhead', {
           bubbles: true,
@@ -797,7 +803,10 @@ export class TimedTextPlayer extends LitElement {
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
     const playing = !!this.playing;
-    if (playing && currentPlayer && currentPlayer !== player) currentPlayer.pause();
+    if (playing && currentPlayer && currentPlayer !== player) {
+      console.log('pause current player in seek', currentPlayer);
+      currentPlayer.pause();
+    }
     // player.currentTime = time - offset + start;
     this._seekMediaElement(player, time - offset + start, '_seek');
     if (playing && currentPlayer && currentPlayer !== player) this.playing = true;
@@ -819,6 +828,7 @@ export class TimedTextPlayer extends LitElement {
     const player = this._currentPlayer();
     if (!player) return;
 
+    console.log('dispatch timeupdate');
     player.dispatchEvent(new Event('timeupdate'));
     if (this.playing)
       this._triggerTimeUpdateTimeout = setTimeout(
@@ -840,11 +850,15 @@ export class TimedTextPlayer extends LitElement {
     const nextPlayer = i <= players.length - 1 ? players[i + 1] : null;
 
     // test for end from media fragment URI
-    if (this._end !== this._duration && this.time >= this._end) player.pause();
+    // if (this._end !== this._duration && this.time >= this._end) {
+    //   console.log('pause on time update > end from media fragment URI', this.time, this._end);
+    //   player.pause();
+    // }
 
     if (player.currentTime < start) {
       // player.currentTime = start;
       // this._seekMediaElement(player, start, '_onTimeUpdate < start');
+      console.log('pause on time update < start', player.currentTime, start);
       player.pause();
     } else if (start <= player.currentTime && player.currentTime <= end) {
       // if (this.playing && player.paused && player.currentTime - start + offset === this.time) player.play();
@@ -857,9 +871,12 @@ export class TimedTextPlayer extends LitElement {
           this._seekMediaElement(nextPlayer, start3, 'nextPlayer');
         }
       }
+
+      console.log('dispatch timeupdate');
       this.dispatchEvent(new CustomEvent('timeupdate'));
       this._dispatchTimedTextEvent();
     } else if (end <= player.currentTime) {
+      console.log('pause on time update > end', player.currentTime, end);
       player.pause();
       // TEST simulate overlap on clips
       // setTimeout(() => {
@@ -892,6 +909,7 @@ export class TimedTextPlayer extends LitElement {
 
     if (start <= player.currentTime && player.currentTime <= end) {
       this.playing = true;
+      console.log('dispatch play');
       this.dispatchEvent(new CustomEvent('play'));
     }
 
@@ -904,6 +922,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   private _onPause(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
+    console.log('onPause', e);
     this._countEvent(e);
     if (this.seeking) return;
 
@@ -911,14 +930,19 @@ export class TimedTextPlayer extends LitElement {
     const [start, end] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
 
     if (this._isLastPlayer(player)) {
+      console.log('last player paused', player);
       this.playing = false;
+      console.log('dispatch pause');
       this.dispatchEvent(new CustomEvent('pause'));
+      console.log('dispatch ended');
       this.dispatchEvent(new CustomEvent('ended'));
       return;
     }
 
     if (start <= player.currentTime && player.currentTime <= end) {
+      console.log('pause inside start<>end', player.currentTime, start, end);
       this.playing = false;
+      console.log('dispatch pause');
       this.dispatchEvent(new CustomEvent('pause'));
     }
   }
