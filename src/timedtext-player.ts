@@ -878,6 +878,7 @@ export class TimedTextPlayer extends LitElement {
     } else if (end <= player.currentTime) {
       console.log('pause on time update > end', player.currentTime, end);
       player.pause();
+      this._currentCue = null;
       // TEST simulate overlap on clips
       // setTimeout(() => {
       //   player.pause();
