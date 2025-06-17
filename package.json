@@ -1,12 +1,12 @@
 {
   "name": "@theirstoryinc/timedtext-player",
-  "version": "0.0.38",
+  "version": "0.0.45",
   "description": "Timed Text player web component",
   "main": "dist/timedtext-player.js",
   "module": "dist/timedtext-player.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/inject-version.js",
     "build:watch": "tsc --watch",
     "clean": "rimraf dist/*",
     "lint": "npm run lint:lit-analyzer && npm run lint:eslint",

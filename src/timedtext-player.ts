@@ -237,17 +237,18 @@ export class TimedTextPlayer extends LitElement {
     console.log('_dom2otio', targetTime);
 
     this.track = track ?? null;
-    if (this._duration !== duration || targetTime !== 0) {
+    if (targetTime >= 0 && (this._duration !== duration || targetTime !== 0)) {
       setTimeout(() => {
         this._seek(targetTime === 0 ? 0.1 : targetTime, true, '_dom2otio()');
         // this.targetTime = 0;
-      }, 800);
+      }, 0);
     }
     this._duration = duration ?? 0;
 
     console.log('dispatch durationchange', { track, duration });
     this.dispatchEvent(new CustomEvent('durationchange'));
     // setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
+    if (this._muted) setTimeout(() => this._players.forEach(p => (p.muted = true)), 500);
     return { track, duration };
   }
 
@@ -793,6 +794,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   private _seek(time: number, _emitTimeUpdate = false, message: string) {
+    if (time < 0) return;
     const player = this._playerAtTime(time);
     if (!player) return;
 
@@ -950,6 +952,14 @@ export class TimedTextPlayer extends LitElement {
 
   getCurrentSection() {
     return this._clipAtTime(this.time).section;
+  }
+
+  /**
+   * Returns the version of the timedtext-player package.
+   * The version is injected at build time from package.json.
+   */
+  public getVersion(): string {
+    return '__TIMEDTEXT_PLAYER_VERSION__';
   }
 
   // Uncomment this to not use Shadow DOM
