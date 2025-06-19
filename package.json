@@ -1,6 +1,6 @@
 {
   "name": "@theirstoryinc/timedtext-player",
-  "version": "0.0.45",
+  "version": "0.0.47",
   "description": "Timed Text player web component",
   "main": "dist/timedtext-player.js",
   "module": "dist/timedtext-player.js",

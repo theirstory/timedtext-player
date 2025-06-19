@@ -444,7 +444,7 @@ export class TimedTextPlayer extends LitElement {
                     @ended=${this._relayEvent}
                     @loadeddata=${this._relayEvent}
                     @loadstart=${this._relayEvent}
-                    @playing=${this._relayEvent}
+                    @playing=${this._onPlaying}
                     @progress=${this._relayEvent}
                     @ratechange=${this._relayEvent}
                     @seeked=${this._onSeeked}
@@ -545,6 +545,18 @@ export class TimedTextPlayer extends LitElement {
       this._playersEventsCounter.set(e.target as HTMLMediaElement, { [e.type]: 1 });
     }
     // this._relayEvent(e);
+  }
+
+  private _onPlaying(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
+    setTimeout(() => {
+      if (this._currentPlayer() !== e.target) {
+        console.log('pause other player', e.target);
+        (e.target as HTMLMediaElement).pause();
+        return;
+      } else {
+        this._relayEvent(e);
+      }
+    }, 200);
   }
 
   private _relayEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
