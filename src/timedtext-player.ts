@@ -9,6 +9,12 @@ import { repeat } from 'lit/directives/repeat.js';
 import { interpolate, dom2otio, findClip, findTimedText, stripTags } from './utils';
 import { Track } from './interfaces';
 
+// Create a simple debug function to avoid import issues
+const isDebugEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('debug-player') === 'true';
+const debug = typeof console !== 'undefined' && isDebugEnabled
+  ? console.log.bind(console, '[player]')
+  : () => {};
+
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
   static override styles =
@@ -73,10 +79,10 @@ export class TimedTextPlayer extends LitElement {
   time = 0;
 
   set currentTime(time: number) {
-    // console.log({ setCurrentTime: time });
+    // debug({ setCurrentTime: time });
     this._seek(time, false, 'setCurrentTime');
     // cancel end
-    // console.log('cancel end', this._end, this._duration);
+    // debug('cancel end', this._end, this._duration);
     // this._end = this._duration;
   }
 
@@ -85,7 +91,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   set currentPseudoTime(time: number) {
-    console.log({ currentPseudoTime: time });
+    debug({ currentPseudoTime: time });
     this._dispatchTimedTextEvent(time);
   }
 
@@ -117,14 +123,14 @@ export class TimedTextPlayer extends LitElement {
     const players = Array.from(document.querySelectorAll('timedtext-player'));
     players.forEach(p => {
       if (p !== this) {
-        console.log('pause other players', p);
+        debug('pause other players', p);
         p.pause();
       }
     });
   }
 
   public pause() {
-    console.log('pause from timedtext-player');
+    debug('pause from timedtext-player');
     const player = this._currentPlayer();
     if (!player) return;
     player.pause();
@@ -180,7 +186,7 @@ export class TimedTextPlayer extends LitElement {
   _textTracks: TextTrackList | undefined = undefined;
 
   get textTracks() {
-    console.log('get textTracks');
+    debug('get textTracks');
     clearTimeout(this._applyTextTracksTimeout);
     this._applyTextTracksTimeout = setTimeout(() => {
       this.applyTextTracks();
@@ -202,7 +208,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   applyTextTracks() {
-    console.log('setTextTracks', this._players);
+    debug('setTextTracks', this._players);
     const firstVideo = this._videos[0];
     if (!firstVideo) return;
 
@@ -234,7 +240,7 @@ export class TimedTextPlayer extends LitElement {
 
   private _dom2otio(sections: NodeListOf<HTMLElement> | undefined, targetTime = 0) {
     const { track, duration } = dom2otio(sections) ?? {};
-    console.log('_dom2otio', targetTime);
+    debug('_dom2otio', targetTime);
 
     this.track = track ?? null;
     if (targetTime >= 0 && (this._duration !== duration || targetTime !== 0)) {
@@ -245,7 +251,7 @@ export class TimedTextPlayer extends LitElement {
     }
     this._duration = duration ?? 0;
 
-    console.log('dispatch durationchange', { track, duration });
+    debug('dispatch durationchange', { track, duration });
     this.dispatchEvent(new CustomEvent('durationchange'));
     // setTimeout(() => this._seek(0.1, true), 800); // FIXME MUX issue?
     if (this._muted) setTimeout(() => this._players.forEach(p => (p.muted = true)), 500);
@@ -260,11 +266,11 @@ export class TimedTextPlayer extends LitElement {
 
     const article = document.querySelector(this.transcriptSelector) as HTMLElement;
 
-    // console.log({ article });
+    // debug({ article });
 
     if (!article) return;
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    // console.log({ sections });
+    // debug({ sections });
     this._dom2otio(sections);
   }
 
@@ -280,10 +286,10 @@ export class TimedTextPlayer extends LitElement {
       article = mutation.target.closest('article');
       widget = mutation.target.closest('.widget');
       if (mutation.type === 'childList') {
-        // console.log('A child node has been added or removed.');
+        // debug('A child node has been added or removed.');
         // article = mutation.target;
       } else if (mutation.type === 'attributes') {
-        // console.log(`The ${mutation.attributeName} attribute was modified.`);
+        // debug(`The ${mutation.attributeName} attribute was modified.`);
         // article = mutation.target.closest('article')
       }
       // if (widget) break;
@@ -293,10 +299,10 @@ export class TimedTextPlayer extends LitElement {
     // if (widget) return;
     if (nonwidgets === 0) return;
 
-    // console.log({ mutationList, _observer, article: article });
+    // debug({ mutationList, _observer, article: article });
     if (!article) return;
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
-    // console.log({ sections });
+    // debug({ sections });
     // if (!sections || sections.length === 0) return;
     // if (!sections) return;
     this._dom2otio(sections);
@@ -311,17 +317,17 @@ export class TimedTextPlayer extends LitElement {
 
   private _reloadRemix(time = 0) {
     if (!this.transcriptSelector) {
-      console.log('no transcriptSelector');
+      debug('no transcriptSelector');
       return null;
     }
     // this.targetTime = time;
-    console.log('remixChange?', time);
+    debug('remixChange?', time);
     // const article = document.getElementById('transcript');
     const article = document.querySelector(this.transcriptSelector) as HTMLElement;
 
     // TODO: create observers per section.
     if (!article) {
-      console.log('no article');
+      debug('no article');
       return null;
     }
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
@@ -346,7 +352,7 @@ export class TimedTextPlayer extends LitElement {
     //   overlay = template.content.childNodes as NodeListOf<HTMLElement>;
 
     // }
-    // console.log({overlay, clip: this._clip});
+    // debug({overlay, clip: this._clip});
 
     const size = 'width: 100%; height: 100%;';
 
@@ -495,8 +501,8 @@ export class TimedTextPlayer extends LitElement {
       const cue = cues[0];
       if (this._currentCue !== cue) {
         this._currentCue = cue as VTTCue;
-        // console.log('cueChange', cue);
-        console.log('dispatch cuechange', cue);
+        // debug('cueChange', cue);
+        debug('dispatch cuechange', cue);
         this.dispatchEvent(
           new CustomEvent('cuechange', {
             detail: { cue },
@@ -514,7 +520,7 @@ export class TimedTextPlayer extends LitElement {
     players.forEach((player: any) => {
       if (player.nodeName === 'VIDEO') {
         const video = player as HTMLVideoElement;
-        console.log('video src?', video.src);
+        debug('video src?', video.src);
         if (Hls.isSupported() && (video.src.endsWith('.m3u8') || video.src.startsWith('data:'))) {
           const hls = new Hls();
           hls.on(Hls.Events.ERROR, function (event, data) {
@@ -528,7 +534,7 @@ export class TimedTextPlayer extends LitElement {
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           // video.src = video.src;
           // video.play();
-          // console.log('Safari? HLS');
+          // debug('Safari? HLS');
         } else {
           // console.error('HLS not supported or no HLS source', video.src);
         }
@@ -550,7 +556,7 @@ export class TimedTextPlayer extends LitElement {
   private _onPlaying(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     setTimeout(() => {
       if (this._currentPlayer() !== e.target) {
-        console.log('pause other player', e.target);
+        debug('pause other player', e.target);
         (e.target as HTMLMediaElement).pause();
         return;
       } else {
@@ -561,7 +567,7 @@ export class TimedTextPlayer extends LitElement {
 
   private _relayEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     // this._countEvent(e);
-    console.log('relay event', e.type, e);
+    debug('relay event', e.type, e);
     // TODO whitelist what events to relay
     // TODO emit only current player events?
     this.dispatchEvent(new CustomEvent(e.type));
@@ -778,7 +784,7 @@ export class TimedTextPlayer extends LitElement {
     // if (this._timedText !== timedText) {
     // if (this._timedTextTime !== time && this.time) {
     if (this.time) {
-      console.log('dispatch playhead');
+      debug('dispatch playhead');
       this.dispatchEvent(
         new CustomEvent('playhead', {
           bubbles: true,
@@ -800,7 +806,7 @@ export class TimedTextPlayer extends LitElement {
       this._timedText = timedText;
       this._timedTextTime = time ?? this.time;
     } else {
-      // console.log('same timed text', time ?? this.time);
+      // debug('same timed text', time ?? this.time);
     }
     // TODO emit also source href, such that source pane can be activated and have sync karaoke?
   }
@@ -810,7 +816,7 @@ export class TimedTextPlayer extends LitElement {
     const player = this._playerAtTime(time);
     if (!player) return;
 
-    if (message) console.log('SEEK', time, message);
+    if (message) debug('SEEK', time, message);
     const currentPlayer = this._currentPlayer();
 
     const [start] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
@@ -818,7 +824,7 @@ export class TimedTextPlayer extends LitElement {
 
     const playing = !!this.playing;
     if (playing && currentPlayer && currentPlayer !== player) {
-      console.log('pause current player in seek', currentPlayer);
+      debug('pause current player in seek', currentPlayer);
       currentPlayer.pause();
     }
     // player.currentTime = time - offset + start;
@@ -826,7 +832,7 @@ export class TimedTextPlayer extends LitElement {
     if (playing && currentPlayer && currentPlayer !== player) this.playing = true;
 
     // if (emitTimeUpdate) { // FIXME
-    //   console.log('events fired');
+    //   debug('events fired');
     //   this.dispatchEvent(new CustomEvent('progress'));
     //   this.dispatchEvent(new CustomEvent('timeupdate'));
     //   this.dispatchEvent(new CustomEvent('durationchange'));
@@ -842,7 +848,7 @@ export class TimedTextPlayer extends LitElement {
     const player = this._currentPlayer();
     if (!player) return;
 
-    console.log('dispatch timeupdate');
+    debug('dispatch timeupdate');
     player.dispatchEvent(new Event('timeupdate'));
     if (this.playing)
       this._triggerTimeUpdateTimeout = setTimeout(
@@ -865,14 +871,14 @@ export class TimedTextPlayer extends LitElement {
 
     // test for end from media fragment URI
     // if (this._end !== this._duration && this.time >= this._end) {
-    //   console.log('pause on time update > end from media fragment URI', this.time, this._end);
+    //   debug('pause on time update > end from media fragment URI', this.time, this._end);
     //   player.pause();
     // }
 
     if (player.currentTime < start) {
       // player.currentTime = start;
       // this._seekMediaElement(player, start, '_onTimeUpdate < start');
-      console.log('pause on time update < start', player.currentTime, start);
+      debug('pause on time update < start', player.currentTime, start);
       player.pause();
     } else if (start <= player.currentTime && player.currentTime <= end) {
       // if (this.playing && player.paused && player.currentTime - start + offset === this.time) player.play();
@@ -886,11 +892,11 @@ export class TimedTextPlayer extends LitElement {
         }
       }
 
-      console.log('dispatch timeupdate');
+      debug('dispatch timeupdate');
       this.dispatchEvent(new CustomEvent('timeupdate'));
       this._dispatchTimedTextEvent();
     } else if (end <= player.currentTime) {
-      console.log('pause on time update > end', player.currentTime, end);
+      debug('pause on time update > end', player.currentTime, end);
       player.pause();
       this._currentCue = null;
       // TEST simulate overlap on clips
@@ -924,7 +930,7 @@ export class TimedTextPlayer extends LitElement {
 
     if (start <= player.currentTime && player.currentTime <= end) {
       this.playing = true;
-      console.log('dispatch play');
+      debug('dispatch play');
       this.dispatchEvent(new CustomEvent('play'));
     }
 
@@ -937,7 +943,7 @@ export class TimedTextPlayer extends LitElement {
   }
 
   private _onPause(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
-    console.log('onPause', e);
+    debug('onPause', e);
     this._countEvent(e);
     if (this.seeking) return;
 
@@ -945,19 +951,19 @@ export class TimedTextPlayer extends LitElement {
     const [start, end] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
 
     if (this._isLastPlayer(player)) {
-      console.log('last player paused', player);
+      debug('last player paused', player);
       this.playing = false;
-      console.log('dispatch pause');
+      debug('dispatch pause');
       this.dispatchEvent(new CustomEvent('pause'));
-      console.log('dispatch ended');
+      debug('dispatch ended');
       this.dispatchEvent(new CustomEvent('ended'));
       return;
     }
 
     if (start <= player.currentTime && player.currentTime <= end) {
-      console.log('pause inside start<>end', player.currentTime, start, end);
+      debug('pause inside start<>end', player.currentTime, start, end);
       this.playing = false;
-      console.log('dispatch pause');
+      debug('dispatch pause');
       this.dispatchEvent(new CustomEvent('pause'));
     }
   }

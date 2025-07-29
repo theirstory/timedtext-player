@@ -6,6 +6,14 @@ import { Clip, TimedText, Track, Gap, Effect } from './interfaces';
 
 import { annotateTokens, generateVTT, type Token, type TokenMetadata } from 'timedtext-vtt';
 
+
+// Create a simple debug function to avoid import issues
+const isDebugEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('debug-player') === 'true';
+const debug = typeof console !== 'undefined' && isDebugEnabled
+  ? console.log.bind(console, '[player]')
+  : () => {};
+
+
 function escapeHTML(str: string): string {
   const escapeChars: { [key: string]: string } = {
     '&': '&amp;',
@@ -34,7 +42,7 @@ export function getOffset(element: HTMLElement): number {
 export function getCaptions(segment: Clip): string {
   const clips = segment.children;
   const timedTexts = clips.flatMap(c => c.timed_texts ?? []);
-  console.log({ clips, timedTexts });
+  debug({ clips, timedTexts });
 
   const tokens: Token[] = timedTexts.map(
     ({ texts: text, marked_range: { start_time, duration } }) =>
@@ -46,7 +54,7 @@ export function getCaptions(segment: Clip): string {
       } as Token),
   );
 
-  console.log({ tokens });
+  debug({ tokens });
 
   const annotatedTokens = annotateTokens(tokens);
   const vttOut = generateVTT([annotatedTokens], true);
@@ -62,7 +70,7 @@ export function getCaptions(segment: Clip): string {
   // }, {} as Record<string, TimedText[]>);
 
   // const captions = Object.values(grouped);
-  // console.log({ captions });
+  // debug({ captions });
 
   // const captions2 = captions.reduce((acc, g) => {
   //   const p = g.findIndex(t => t.metadata.pilcrow);
@@ -91,7 +99,7 @@ export function getCaptions(segment: Clip): string {
   //   return [...acc, prev, g];
   // }, [] as (TimedText[] | undefined)[]);
 
-  // console.log({ captions2, captions3 });
+  // debug({ captions2, captions3 });
 
   // const formatSeconds = (seconds: number): string =>
   //   seconds ? new Date(parseFloat(seconds.toFixed(3)) * 1000).toISOString().substring(11, 23) : '00:00:00:000';
@@ -139,11 +147,11 @@ export function dom2otio(
   sections: NodeListOf<HTMLElement> | undefined,
 ): { track: Track; duration: number } | undefined {
   if (!sections) {
-    console.log('No sections found');
+    debug('No sections found');
     return;
   }
 
-  // console.log('sections', sections);
+  // debug('sections', sections);
 
   const track = {
     OTIO_SCHEMA: 'Track.1',
@@ -166,7 +174,7 @@ export function dom2otio(
         );
         const effects: NodeListOf<HTMLElement> | undefined = s.querySelectorAll('div[data-t][data-effect]');
 
-        // console.log('TRACK', { src, id, start, end, children, effects });
+        // debug('TRACK', { src, id, start, end, children, effects });
 
         return {
           OTIO_SCHEMA: 'Clip.1', // TODO: verify with OTIO spec, should be Composable?
@@ -397,7 +405,7 @@ export function dom2otio(
 
   const duration = track.children.reduce((acc, c) => acc + c.source_range.duration, 0);
 
-  // console.log({ track, duration });
+  // debug({ track, duration });
 
   // this.track = track;
   // this._duration = duration;
