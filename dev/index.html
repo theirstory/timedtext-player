@@ -148,15 +148,15 @@
 
     <template id="overlay">
       <div style="position: absolute; top: 0; left: 0">
-        <h2 style="color: yellow; background-color: rgba(0, 0, 0, 0.3)">${text}?</h2>
+        <h2 style="color: yellow; background-color: rgba(0, 0, 0, 0.3)">${text}</h2>
         <h4 style="color: white; text-align: center; margin-top: 30%">${cue}</h4>
         <!-- <p>${progress}</p> -->
       </div>
     </template>
 
     <template id="title-full">
-      <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7)">
-        <h2 style="color: white; text-align: center; margin-top: 30%">${title}</h2>
+      <div style="position: absolute; top: 0; left: 0; background-color: rgba(0, 0, 0, 0.7); transform-origin: top left; transform: scale(${scale}); overflow: hidden; width: ${width}; height: ${height};">
+        <h2 style="color: white; text-align: center; margin-top: 30%">${title}???${scale}???</h2>
         <h3 style="color: white; text-align: center; margin-top: 30%">${subtitle}</h3>
         <h4 style="color: white; text-align: center; margin-top: 30%">${cue}</h4>
       </div>
@@ -171,15 +171,19 @@
 
     <article id="empty"></article>
 
-    <article id="transcript">
-      <!-- ts test -->
-      <!-- <div data-t="4,10" data-effect="#overlay" data-text="Richard Feynman">
+          <!-- <div data-t="4,10" data-effect="#overlay" data-text="Richard Feynman">
         <input type="test" value="Richard Feynman"/>
       </div> -->
 
       <!-- <section type="title" data-t="5,10" data-title="On the Mayans" data-media-src="https://s3-eu-west-1.amazonaws.com/files.hyperaud.io/tmp/3600-silence.wav" data-player="#gap1">
         <h1>5s title: On the Mayans</h1>
       </section> -->
+        <!-- <div data-t="2.65,7" data-effect="#fin">Fade In effect</div> -->
+
+
+    <article id="transcript">
+      <!-- ts test -->
+
 
       <!-- ts test -->
       <section
@@ -187,21 +191,20 @@
         data-media-src="https://s3-eu-west-1.amazonaws.com/files.hyperaud.io/tmp/NM-zWTU7X-k.mp4"
         data-player="#video1"
       >
-        <!-- <div data-t="2.65,7" data-effect="#fin">Fade In effect</div> -->
 
         <div>
-          <div data-t="4,10" data-effect="#overlay" data-text="Richard Feynman">overlay effect</div>
+          <!-- <div data-t="4,10" data-effect="#overlay" data-text="Richard Feynman">overlay effect</div> -->
 
           <div
-            data-t="10.79999995,20.79999995"
+            data-t="0,20"
             data-id="E-dMc7J8-dMOEbHITx65dCd"
             data-type="effect"
             data-component="title"
             data-effect="#title-full"
-            data-title="Title"
+            data-title="R Feynman"
             data-template="#title-full"
             data-duration="10"
-            data-subtitle="Subtitle"
+            data-subtitle="Subtitle?"
           >
             Title
           </div>
@@ -289,6 +292,12 @@
           </div>
         </div>
       </section>
+
+    </article>
+
+    <hr />
+
+    <article id="transcript2">
 
       <section
         data-t="2.65,334.63"

@@ -242,6 +242,9 @@ export class TimedTextPlayer extends LitElement {
     const { track, duration } = dom2otio(sections) ?? {};
     debug('_dom2otio', targetTime);
 
+    // Force scale recomputation when DOM structure changes
+    this._forceScaleRecompute();
+
     this.track = track ?? null;
     if (targetTime >= 0 && (this._duration !== duration || targetTime !== 0)) {
       setTimeout(() => {
@@ -342,6 +345,29 @@ export class TimedTextPlayer extends LitElement {
   @property({ type: String, attribute: 'transcript' })
   transcriptSelector: string | undefined;
 
+  // Memoization properties for _getScale()
+  private _scale: number = 1;
+  private _scaleCallCount: number = 0;
+  private _scaleUpdateInterval: number = 60;
+
+  private _forceScaleRecompute() {
+    this._scaleCallCount = 0; // Reset counter to force recomputation on next call
+  }
+
+  private _getScale() {
+    this._scaleCallCount++;
+
+    // Recalculate scale every 60 calls or on first call
+    if (this._scaleCallCount === 1 || this._scaleCallCount % this._scaleUpdateInterval === 0) {
+      const parent = this.parentElement as HTMLElement;
+      const scaleX = parent.clientWidth / 1920;
+      const scaleY = parent.clientHeight / 1080;
+      this._scale = Math.min(scaleX, scaleY);
+    }
+
+    return this._scale;
+  }
+
   override render() {
     setTimeout(() => this._hls(), 10);
     let overlay;
@@ -379,9 +405,11 @@ export class TimedTextPlayer extends LitElement {
                 src: clip.media_reference.target,
                 captions: clip.metadata.captionsUrl,
                 ...clip.metadata?.data,
-                width: '100%',
-                height: '100%',
+                width: "1920px",
+                height: "1080px",
+                scale: this._getScale().toFixed(3), // TODO memoize
               };
+              console.log('props', props);
 
               template.innerHTML = interpolate(templateString, props);
 
@@ -408,6 +436,9 @@ export class TimedTextPlayer extends LitElement {
                       fadeIn,
                       ...effect.metadata?.data,
                       cue: stripTags(this._currentCue?.text ?? ''),
+                      width: "1920px",
+                      height: "1080px",
+                      scale: this._getScale().toFixed(3), // TODO memoize
                     },
                   );
                   return { id, children: template.content.childNodes as NodeListOf<HTMLElement> };

@@ -26,9 +26,23 @@ function escapeHTML(str: string): string {
 }
 
 export function interpolate(str: string, params: { [key: string]: any }) {
+  const missingKeys: string[] = [];
+
+  // Replace template literals with safe access that returns empty string for missing keys
+  const safeStr = str.replace(/\$\{([^}]+)\}/g, (_match, key) => {
+    const trimmedKey = key.trim();
+    return `\${typeof ${trimmedKey} !== 'undefined' ? ${trimmedKey} : (function() {
+      if (!missingKeys.includes('${trimmedKey}')) {
+        missingKeys.push('${trimmedKey}');
+        console.log('Missing interpolation key:', '${trimmedKey}');
+      }
+      return '';
+    })()}`;
+  });
+
   let names = Object.keys(params);
   let vals = Object.values(params);
-  return new Function(...names, `return \`${str}\`;`)(...vals.map(escapeHTML));
+  return new Function('missingKeys', ...names, `return \`${safeStr}\`;`)(missingKeys, ...vals.map(escapeHTML));
 }
 
 export function getTimeRange(element: HTMLElement): number[] {
