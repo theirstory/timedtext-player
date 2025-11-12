@@ -108,24 +108,28 @@ export class TimedTextPlayer extends LitElement {
   }
 
   public play() {
-    let player = this._currentPlayer();
-    if (!player) return;
+    this._queuePlaybackOperation(async () => {
+      let player = this._currentPlayer();
+      if (!player) return;
 
-    if (this.duration - this.currentTime < 0.4) {
-      // FIXME
-      this._seek(0, false, 'play()');
-      player = this._playerAtTime(0);
-      player!.play();
-    } else {
-      player!.play();
-    }
-    // pause any other players in the document
-    const players = Array.from(document.querySelectorAll('timedtext-player'));
-    players.forEach(p => {
-      if (p !== this) {
-        debug('pause other players', p);
-        p.pause();
+      // Handle end-of-timeline restart
+      if (this.duration - this.currentTime < 0.4) {
+        this._seek(0, false, 'play()');
+        player = this._playerAtTime(0);
+        if (!player) return;
       }
+
+      // Pause other timedtext-player instances in the document
+      const players = Array.from(document.querySelectorAll('timedtext-player'));
+      players.forEach(p => {
+        if (p !== this) {
+          debug('pause other players', p);
+          p.pause();
+        }
+      });
+
+      // Use central method to ensure single player
+      await this._transitionToPlayer(player);
     });
   }
 
@@ -585,15 +589,18 @@ export class TimedTextPlayer extends LitElement {
   }
 
   private _onPlaying(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
-    setTimeout(() => {
-      if (this._currentPlayer() !== e.target) {
-        debug('pause other player', e.target);
-        (e.target as HTMLMediaElement).pause();
-        return;
-      } else {
-        this._relayEvent(e);
-      }
-    }, 200);
+    const target = e.target as HTMLMediaElement;
+    const currentPlayer = this._currentPlayer();
+
+    if (currentPlayer !== target) {
+      debug('pause other player immediately', target);
+      target.pause();
+      return;
+    }
+
+    // Defensive: ensure no other player is playing
+    this._pauseAllExcept(target);
+    this._relayEvent(e);
   }
 
   private _relayEvent(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
@@ -650,6 +657,12 @@ export class TimedTextPlayer extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
+
+    // Start periodic state validation
+    this._stateValidationInterval = window.setInterval(() => {
+      this._validatePlaybackState();
+    }, 500); // Check every 500ms
+
     if (!this.transcriptSelector) return;
     // const article = document.getElementById('transcript');
     const article = document.querySelector(this.transcriptSelector) as HTMLElement;
@@ -665,6 +678,21 @@ export class TimedTextPlayer extends LitElement {
     article.addEventListener('click', this._transcriptClick.bind(this));
 
     // this.addEventListener('remixChange', this._reloadRemix.bind(this));
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+
+    // Clear state validation interval
+    if (this._stateValidationInterval !== undefined) {
+      clearInterval(this._stateValidationInterval);
+      this._stateValidationInterval = undefined;
+    }
+
+    // Disconnect mutation observer
+    if (this._observer) {
+      this._observer.disconnect();
+    }
   }
 
   private _transcriptClick(e: MouseEvent) {
@@ -731,6 +759,107 @@ export class TimedTextPlayer extends LitElement {
 
   private _currentPlayer(): HTMLMediaElement | undefined {
     return this._playerAtTime(this.time);
+  }
+
+  // Playback coordination improvements
+  private _playbackQueue: Array<() => Promise<void>> = [];
+  private _processingQueue = false;
+  private _stateValidationInterval: number | undefined = undefined;
+
+  /**
+   * Pauses all players except the specified target player.
+   * This is a defensive method to ensure only one player is active.
+   */
+  private _pauseAllExcept(targetPlayer: HTMLMediaElement): void {
+    const players = Array.from(this._players);
+    players.forEach(p => {
+      if (p !== targetPlayer && !p.paused) {
+        debug('pause other active player', p);
+        p.pause();
+      }
+    });
+  }
+
+  /**
+   * Transitions playback to the specified player with proper coordination.
+   * Ensures all other players are paused before starting the target.
+   */
+  private async _transitionToPlayer(player: HTMLMediaElement): Promise<void> {
+    debug('transitioning to player', player);
+
+    // 1. Pause all other players
+    this._pauseAllExcept(player);
+
+    // 2. Ensure player is at correct time
+    const [start] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
+    if (Math.abs(player.currentTime - start) > 0.1) {
+      player.currentTime = start;
+    }
+
+    // 3. Play with error handling
+    try {
+      await player.play();
+      debug('player started successfully', player);
+    } catch (err: any) {
+      console.error('Failed to play next video', err, player);
+
+      // Handle autoplay restrictions
+      if (err.name === 'NotAllowedError') {
+        // User interaction required
+        this.dispatchEvent(new CustomEvent('autoplayblocked', { detail: { player, error: err } }));
+      }
+    }
+  }
+
+  /**
+   * Queues playback operations to prevent race conditions from rapid commands.
+   */
+  private async _queuePlaybackOperation(operation: () => Promise<void>): Promise<void> {
+    this._playbackQueue.push(operation);
+
+    if (!this._processingQueue) {
+      this._processingQueue = true;
+
+      while (this._playbackQueue.length > 0) {
+        const op = this._playbackQueue.shift();
+        if (op) {
+          try {
+            await op();
+          } catch (err) {
+            console.error('Playback operation failed', err);
+          }
+        }
+      }
+
+      this._processingQueue = false;
+    }
+  }
+
+  /**
+   * Validates that playback state is consistent and repairs if needed.
+   * This is a defensive mechanism to catch and fix state issues.
+   */
+  private _validatePlaybackState(): void {
+    const players = Array.from(this._players);
+    const playingPlayers = players.filter(p => !p.paused);
+
+    if (playingPlayers.length > 1) {
+      console.warn('Multiple players playing detected', playingPlayers);
+
+      // Emergency repair: pause all except current
+      const currentPlayer = this._currentPlayer();
+      playingPlayers.forEach(p => {
+        if (p !== currentPlayer) {
+          console.warn('Emergency pause of unexpected player', p);
+          p.pause();
+        }
+      });
+    }
+
+    if (this.playing && playingPlayers.length === 0) {
+      console.warn('State says playing but no player is playing');
+      // Could auto-repair by starting current player
+    }
   }
 
   private _clipAtTime(time: number): any {
@@ -848,19 +977,28 @@ export class TimedTextPlayer extends LitElement {
     if (!player) return;
 
     if (message) debug('SEEK', time, message);
-    const currentPlayer = this._currentPlayer();
 
     const [start] = (player.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
     const offset = parseFloat(player.getAttribute('data-offset') ?? '0');
 
     const playing = !!this.playing;
-    if (playing && currentPlayer && currentPlayer !== player) {
-      debug('pause current player in seek', currentPlayer);
-      currentPlayer.pause();
-    }
-    // player.currentTime = time - offset + start;
+
+    // Always pause ALL players during seek, regardless of target
+    const players = Array.from(this._players);
+    players.forEach(p => {
+      if (!p.paused) {
+        debug('pause player during seek', p);
+        p.pause();
+      }
+    });
+
+    // Seek target player to the calculated time
     this._seekMediaElement(player, time - offset + start, '_seek');
-    if (playing && currentPlayer && currentPlayer !== player) this.playing = true;
+
+    // If was playing, transition to the new player
+    if (playing) {
+      this._transitionToPlayer(player);
+    }
 
     // if (emitTimeUpdate) { // FIXME
     //   debug('events fired');
@@ -934,7 +1072,9 @@ export class TimedTextPlayer extends LitElement {
       // setTimeout(() => {
       //   player.pause();
       // }, 5000);
-      if (nextPlayer) nextPlayer.play();
+      if (nextPlayer) {
+        this._transitionToPlayer(nextPlayer);
+      }
     }
   }
 
