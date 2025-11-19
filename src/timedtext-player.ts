@@ -11,9 +11,7 @@ import { Track } from './interfaces';
 
 // Create a simple debug function to avoid import issues
 const isDebugEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('debug-player') === 'true';
-const debug = typeof console !== 'undefined' && isDebugEnabled
-  ? console.log.bind(console, '[player]')
-  : () => {};
+const debug = typeof console !== 'undefined' && isDebugEnabled ? console.log.bind(console, '[player]') : () => {};
 
 @customElement('timedtext-player')
 export class TimedTextPlayer extends LitElement {
@@ -405,11 +403,11 @@ export class TimedTextPlayer extends LitElement {
                 src: clip.media_reference.target,
                 captions: clip.metadata.captionsUrl,
                 ...clip.metadata?.data,
-                width: "1920px",
-                height: "1080px",
+                width: '1920px',
+                height: '1080px',
                 scale: this._getScale().toFixed(3), // TODO memoize
               };
-              console.log('props', props);
+              // console.log('props', props);
 
               template.innerHTML = interpolate(templateString, props);
 
@@ -436,8 +434,8 @@ export class TimedTextPlayer extends LitElement {
                       fadeIn,
                       ...effect.metadata?.data,
                       cue: stripTags(this._currentCue?.text ?? ''),
-                      width: "1920px",
-                      height: "1080px",
+                      width: '1920px',
+                      height: '1080px',
                       scale: this._getScale().toFixed(3), // TODO memoize
                     },
                   );
@@ -934,7 +932,11 @@ export class TimedTextPlayer extends LitElement {
       // setTimeout(() => {
       //   player.pause();
       // }, 5000);
-      if (nextPlayer) nextPlayer.play();
+      if (nextPlayer) {
+        nextPlayer.play().catch(error => {
+          console.error('Failed to play nextPlayer:', nextPlayer, error);
+        });
+      }
     }
   }
 
