@@ -122,7 +122,7 @@ export class TimedTextPlayer extends LitElement {
     players.forEach(p => {
       if (p !== this) {
         debug('pause other players', p);
-        p.pause();
+        p!.pause();
       }
     });
   }
@@ -131,7 +131,7 @@ export class TimedTextPlayer extends LitElement {
     debug('pause from timedtext-player');
     const player = this._currentPlayer();
     if (!player) return;
-    player.pause();
+    player!.pause();
   }
 
   @state()
@@ -583,11 +583,16 @@ export class TimedTextPlayer extends LitElement {
   }
 
   private _onPlaying(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
+    // pause previous player if still playing
+    if (this._prevPlayer && !this._prevPlayer.paused && this._currentPlayer() !== this._prevPlayer) {
+      debug('pause previous player', this._prevPlayer);
+      this._prevPlayer.pause();
+    }
+
     setTimeout(() => {
       if (this._currentPlayer() !== e.target) {
-        debug('pause other player', e.target);
-        (e.target as HTMLMediaElement).pause();
-        return;
+        debug('pause other player in timeout', e.target);
+        if (e.target && !(e.target as HTMLMediaElement).paused) (e.target as HTMLMediaElement).pause();
       } else {
         this._relayEvent(e);
       }
@@ -718,13 +723,17 @@ export class TimedTextPlayer extends LitElement {
 
   private _playerAtTime(time: number): HTMLMediaElement | undefined {
     const players = Array.from(this._players);
-    return (
-      players.find(p => {
-        const [start, end] = (p.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
-        const offset = parseFloat(p.getAttribute('data-offset') ?? '0');
-        return start <= time - offset + start && time - offset + start <= end;
-      }) ?? (players.length > 0 ? players[players.length - 1] : undefined)
-    );
+
+    const p = players.filter(p => {
+      const [start, end] = (p.getAttribute('data-t') ?? '0,0').split(',').map(v => parseFloat(v));
+      const offset = parseFloat(p.getAttribute('data-offset') ?? '0');
+      return start <= time - offset + start && time - offset + start <= end;
+    });
+
+    if (p.length > 1) console.log('overlapping players at time', time, p);
+
+    if (p.length > 0) return p[p.length - 1];
+    return players.length > 0 ? players[players.length - 1] : undefined;
   }
 
   private _currentPlayer(): HTMLMediaElement | undefined {
@@ -854,7 +863,7 @@ export class TimedTextPlayer extends LitElement {
     const playing = !!this.playing;
     if (playing && currentPlayer && currentPlayer !== player) {
       debug('pause current player in seek', currentPlayer);
-      currentPlayer.pause();
+      currentPlayer!.pause();
     }
     // player.currentTime = time - offset + start;
     this._seekMediaElement(player, time - offset + start, '_seek');
@@ -886,6 +895,9 @@ export class TimedTextPlayer extends LitElement {
       ); // TODO use Clock
   }
 
+  _prevPlayer: HTMLMediaElement | null = null;
+  // _nextPlayer: HTMLMediaElement | null = null;
+
   private _onTimeUpdate(e: Event & { target: HTMLAudioElement | HTMLVideoElement }) {
     this._countEvent(e);
     if (this.playing && this.seeking) return;
@@ -908,7 +920,7 @@ export class TimedTextPlayer extends LitElement {
       // player.currentTime = start;
       // this._seekMediaElement(player, start, '_onTimeUpdate < start');
       debug('pause on time update < start', player.currentTime, start);
-      player.pause();
+      player!.pause();
     } else if (start <= player.currentTime && player.currentTime <= end) {
       // if (this.playing && player.paused && player.currentTime - start + offset === this.time) player.play();
       if (player.currentTime !== start) this.time = player.currentTime - start + offset; // FIXME: that "if" to avoid 1st seek time update
@@ -926,13 +938,14 @@ export class TimedTextPlayer extends LitElement {
       this._dispatchTimedTextEvent();
     } else if (end <= player.currentTime) {
       debug('pause on time update > end', player.currentTime, end);
-      player.pause();
+      player!.pause();
       this._currentCue = null;
       // TEST simulate overlap on clips
       // setTimeout(() => {
       //   player.pause();
       // }, 5000);
       if (nextPlayer) {
+        this._prevPlayer = player;
         nextPlayer.play().catch(error => {
           console.error('Failed to play nextPlayer:', nextPlayer, error);
         });
