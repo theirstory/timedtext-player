@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2021",
     "module": "es2020",
-    "lib": ["es2021", "DOM", "DOM.Iterable"],
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
     "declaration": true,
     "declarationMap": true,
     "inlineSourceMap": true,
@@ -22,6 +22,7 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitOverride": true,
     "removeComments": false,
+    "skipLibCheck": true,
     "plugins": [
       {
         "name": "ts-lit-plugin",

@@ -20,10 +20,17 @@ export default {
     sourcemap: 'inline',
   },
   external: [], // <--- Add this line!
-  onwarn(warning) {
-    if (warning.code !== 'THIS_IS_UNDEFINED') {
-      console.error(`(!) ${warning.message}`);
+  onwarn(warning, warn) {
+    // Suppress circular dependency warnings from node_modules
+    if (warning.code === 'CIRCULAR_DEPENDENCY' && warning.message.includes('node_modules')) {
+      return;
     }
+    // Suppress THIS_IS_UNDEFINED warnings
+    if (warning.code === 'THIS_IS_UNDEFINED') {
+      return;
+    }
+    // Show all other warnings
+    warn(warning);
   },
   plugins: [
     replace({

@@ -37,6 +37,7 @@
     "@medv/finder": "^3.2.0",
     "hls.js": "1.5.16",
     "lit": "^3.2.0",
+    "mediabunny": "^1.25.3",
     "timedtext-vtt": "0.1.4"
   },
   "devDependencies": {

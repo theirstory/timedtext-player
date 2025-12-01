@@ -1,18 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable prefer-const */
 import { finder } from '@medv/finder';
+import { Output, BufferTarget, Mp4OutputFormat, CanvasSource, getFirstEncodableVideoCodec } from 'mediabunny';
 
 import { Clip, TimedText, Track, Gap, Effect } from './interfaces';
 
 import { annotateTokens, generateVTT, type Token, type TokenMetadata } from 'timedtext-vtt';
 
-
 // Create a simple debug function to avoid import issues
 const isDebugEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('debug-player') === 'true';
-const debug = typeof console !== 'undefined' && isDebugEnabled
-  ? console.log.bind(console, '[player]')
-  : () => {};
-
+const debug = typeof console !== 'undefined' && isDebugEnabled ? console.log.bind(console, '[player]') : () => {};
 
 function escapeHTML(str: string): string {
   const escapeChars: { [key: string]: string } = {
@@ -474,4 +471,49 @@ export function findTimedText(timedTexts: TimedText[], sourceTime: number): Time
 
 export function stripTags(str: string): string {
   return str.replace(/<\/?[^>]+(>|$)/g, '');
+}
+
+export async function generateBlackVideoURL(durationSeconds: number): Promise<string> {
+  const width = 426;
+  const height = 240;
+  const fps = 1; // minimum fps → minimal memory/CPU
+  const totalFrames = Math.max(1, Math.ceil(durationSeconds * fps));
+
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d')!;
+
+  // Paint the single black frame once
+  ctx.fillStyle = 'green';
+  ctx.fillRect(0, 0, width, height);
+
+  const output = new Output({
+    target: new BufferTarget(),
+    format: new Mp4OutputFormat(),
+  });
+
+  const codec = await getFirstEncodableVideoCodec(output.format.getSupportedVideoCodecs(), { width, height });
+  if (!codec) throw new Error('No supported video codec.');
+
+  const canvasSource = new CanvasSource(canvas, {
+    codec,
+    bitrate: 100000, // 100kbps - low bitrate for minimal memory usage
+  });
+
+  output.addVideoTrack(canvasSource, { frameRate: fps });
+  await output.start();
+
+  // Re-add the identical black frame N times
+  for (let i = 0; i < totalFrames; i++) {
+    const timestamp = i / fps;
+    await canvasSource.add(timestamp, 1 / fps);
+  }
+
+  canvasSource.close();
+  await output.finalize();
+
+  const blob = new Blob([output.target.buffer!], {
+    type: output.format.mimeType,
+  });
+
+  return URL.createObjectURL(blob);
 }
