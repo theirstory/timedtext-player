@@ -38,14 +38,17 @@ export class LitePlayer extends LitElement {
       width: 100%;
       height: 100%;
     }
+    .container > video {
+      display: none;
+    }
     .active {
-      outline: 4px solid red;
+      /* outline: 4px solid red; */
       display: block !important;
     }
     .wrapper {
       position: relative;
-      /* display: none; */
-      display: block;
+      display: none;
+      /* display: block; */
       color: white;
     }
     .overlay-layer {
@@ -86,9 +89,21 @@ export class LitePlayer extends LitElement {
   @state()
   _clip: any = null;
 
+  @state()
+  private _isBuffering = false;
+
+  private _trackVideoStates = new Map<
+    HTMLVideoElement,
+    { readyState: number; networkState: number; canPlay: boolean; canPlayThrough: boolean }
+  >();
+
   // ============================================================================
   // HTMLMediaElement API - Properties
   // ============================================================================
+
+  private _getAllTrackVideos(): HTMLVideoElement[] {
+    return Array.from(this.renderRoot.querySelectorAll('div.wrapper video'));
+  }
 
   get currentTime(): number {
     return this._video?.currentTime ?? this.time;
@@ -158,11 +173,17 @@ export class LitePlayer extends LitElement {
   }
 
   get readyState(): number {
-    return this._video?.readyState ?? 0;
+    const trackVideos = this._getAllTrackVideos();
+    if (trackVideos.length === 0) return this._video?.readyState ?? 0;
+    const states = [this._video?.readyState ?? 0, ...trackVideos.map(v => v.readyState)];
+    return Math.min(...states);
   }
 
   get networkState(): number {
-    return this._video?.networkState ?? 0;
+    const trackVideos = this._getAllTrackVideos();
+    const states = [this._video?.networkState ?? 0, ...trackVideos.map(v => v.networkState)];
+    if (states.includes(2)) return 2; // NETWORK_LOADING
+    return Math.max(...states);
   }
 
   get buffered(): TimeRanges {
@@ -195,6 +216,10 @@ export class LitePlayer extends LitElement {
     return this._video?.error ?? null;
   }
 
+  get isBuffering(): boolean {
+    return this._isBuffering;
+  }
+
   // ============================================================================
   // HTMLMediaElement API - Methods
   // ============================================================================
@@ -203,6 +228,18 @@ export class LitePlayer extends LitElement {
     if (!this._video) {
       return Promise.reject(new DOMException('Video element not ready', 'InvalidStateError'));
     }
+
+    // Get all videos involved, including main and track videos
+    const trackVideos = this._getAllTrackVideos();
+    const allVideos = [this._video, ...trackVideos];
+
+    // If any video is not sufficiently ready, reject
+    // readyState of 3 (HAVE_FUTURE_DATA) or 4 (HAVE_ENOUGH_DATA) is considered "ready"
+    const notReadyVideo = allVideos.find(video => !video || video.readyState < 3);
+    if (notReadyVideo) {
+      return Promise.reject(new DOMException('Not all video elements are ready', 'InvalidStateError'));
+    }
+
     return this._video.play();
   }
 
@@ -477,6 +514,12 @@ export class LitePlayer extends LitElement {
     this.dispatchEvent(new CustomEvent(e.type, { bubbles: true, composed: true }));
   }
 
+  private _onPause(e: Event & { target: HTMLVideoElement }) {
+    this._relayEvent(e);
+    const activeVideos = this.renderRoot.querySelectorAll('div.wrapper video');
+    activeVideos.forEach(video => (video as HTMLVideoElement).pause());
+  }
+
   private _onTimeUpdate(e: Event & { target: HTMLVideoElement }) {
     this.time = e.target.currentTime;
     this.dispatchEvent(new CustomEvent('timeupdate', { bubbles: true, composed: true }));
@@ -494,15 +537,15 @@ export class LitePlayer extends LitElement {
     console.log('video', { video, src, start, end, time: this.time, offset, targetTime });
 
     if (!video) return;
-    // if (this.time >= start + offset && this.time < end + offset && src) {
+
     if (Math.abs(video.currentTime - targetTime) > 1) {
       video.currentTime = targetTime;
     }
     if (video.paused && !this.paused) video.play();
     if (!video.paused && this.paused) video.pause();
-    // } else {
-    //   if (!video.paused) video.pause();
-    // }
+    // pause all other videos
+    const activeVideos = this.renderRoot.querySelectorAll('div.wrapper:not(.active) video');
+    activeVideos.forEach(video => (video as HTMLVideoElement).pause());
   }
 
   private _cueChange(e: Event & { target: HTMLTrackElement }) {
@@ -526,6 +569,78 @@ export class LitePlayer extends LitElement {
     } else {
       this._currentCue = null;
     }
+  }
+
+  // ============================================================================
+  // Track Video Event Handlers (Aggregate State)
+  // ============================================================================
+
+  private _allVideosCanPlay(): boolean {
+    const trackVideos = this._getAllTrackVideos();
+    if (trackVideos.length === 0) return (this._video?.readyState ?? 0) >= 3; // HAVE_FUTURE_DATA
+    const mainReady = (this._video?.readyState ?? 0) >= 3;
+    const allTrackReady = trackVideos.every(v => v.readyState >= 3);
+    return mainReady && allTrackReady;
+  }
+
+  private _allVideosCanPlayThrough(): boolean {
+    const trackVideos = this._getAllTrackVideos();
+    if (trackVideos.length === 0) return (this._video?.readyState ?? 0) >= 4; // HAVE_ENOUGH_DATA
+    const mainReady = (this._video?.readyState ?? 0) >= 4;
+    const allTrackReady = trackVideos.every(v => v.readyState >= 4);
+    return mainReady && allTrackReady;
+  }
+
+  private _onTrackVideoWaiting(_e: Event & { target: HTMLVideoElement }) {
+    this._isBuffering = true;
+    this.dispatchEvent(new CustomEvent('waiting', { bubbles: true, composed: true }));
+  }
+
+  private _onTrackVideoCanPlay(e: Event & { target: HTMLVideoElement }) {
+    this._trackVideoStates.set(e.target, {
+      readyState: e.target.readyState,
+      networkState: e.target.networkState,
+      canPlay: true,
+      canPlayThrough: e.target.readyState >= 4,
+    });
+
+    if (this._allVideosCanPlay()) {
+      this._isBuffering = false;
+      this.dispatchEvent(new CustomEvent('canplay', { bubbles: true, composed: true }));
+    }
+  }
+
+  private _onTrackVideoCanPlayThrough(e: Event & { target: HTMLVideoElement }) {
+    const state = this._trackVideoStates.get(e.target);
+    if (state) {
+      state.canPlayThrough = true;
+      state.readyState = e.target.readyState;
+    } else {
+      this._trackVideoStates.set(e.target, {
+        readyState: e.target.readyState,
+        networkState: e.target.networkState,
+        canPlay: e.target.readyState >= 3,
+        canPlayThrough: true,
+      });
+    }
+
+    if (this._allVideosCanPlayThrough()) {
+      this._isBuffering = false;
+      this.dispatchEvent(new CustomEvent('canplaythrough', { bubbles: true, composed: true }));
+    }
+  }
+
+  private _onTrackVideoStalled(_e: Event & { target: HTMLVideoElement }) {
+    this._isBuffering = true;
+    this.dispatchEvent(new CustomEvent('stalled', { bubbles: true, composed: true }));
+  }
+
+  private _onTrackVideoSuspend(_e: Event & { target: HTMLVideoElement }) {
+    this.dispatchEvent(new CustomEvent('suspend', { bubbles: true, composed: true }));
+  }
+
+  private _onTrackVideoProgress(_e: Event & { target: HTMLVideoElement }) {
+    this.dispatchEvent(new CustomEvent('progress', { bubbles: true, composed: true }));
   }
 
   // ============================================================================
@@ -633,12 +748,11 @@ export class LitePlayer extends LitElement {
     return html`
       <div class="container">
         <video
-          controls
           .src=${this.src}
           .poster=${this.poster ?? ''}
           @timeupdate=${this._onTimeUpdate}
           @play=${this._relayEvent}
-          @pause=${this._relayEvent}
+          @pause=${this._onPause}
           @playing=${this._relayEvent}
           @ended=${this._relayEvent}
           @seeked=${this._relayEvent}
@@ -666,11 +780,20 @@ export class LitePlayer extends LitElement {
           sources,
           src => src,
           src => {
-            const currentClip = this._clipAtTime(this.time).clip;
-            const active = currentClip?.media_reference.target === src;
+            const { clip: currentClip, section } = this._clipAtTime(this.time);
+            const active = currentClip?.media_reference.target === src || section?.media_reference.target === src;
 
             return html`<div class=${active ? 'active wrapper' : 'wrapper'} style="width: 100%; height: 100%;">
-              <video controls preload="auto" src=${src}></video>
+              <video
+                preload="auto"
+                src=${src}
+                @waiting=${this._onTrackVideoWaiting}
+                @canplay=${this._onTrackVideoCanPlay}
+                @canplaythrough=${this._onTrackVideoCanPlayThrough}
+                @stalled=${this._onTrackVideoStalled}
+                @suspend=${this._onTrackVideoSuspend}
+                @progress=${this._onTrackVideoProgress}
+              ></video>
             </div>`;
           },
         )}
