@@ -263,7 +263,7 @@ export class LitePlayer extends LitElement {
   // ============================================================================
 
   @property({ type: String, attribute: 'transcript' })
-  transcriptSelector: string | undefined;
+  transcript: string | undefined;
 
   @property({ type: String, attribute: 'player' })
   playerSelector: string | undefined;
@@ -295,9 +295,9 @@ export class LitePlayer extends LitElement {
   }
 
   public parseTranscript() {
-    if (!this.transcriptSelector) return;
+    if (!this.transcript) return;
 
-    const article = document.querySelector(this.transcriptSelector) as HTMLElement;
+    const article = document.querySelector(this.transcript) as HTMLElement;
     if (!article) return;
 
     const sections: NodeListOf<HTMLElement> | undefined = article.querySelectorAll('section[data-media-src]');
@@ -305,13 +305,13 @@ export class LitePlayer extends LitElement {
   }
 
   private _reloadRemix(time = 0) {
-    if (!this.transcriptSelector) {
-      debug('no transcriptSelector');
+    if (!this.transcript) {
+      debug('no transcript selector');
       return null;
     }
 
     debug('remixChange?', time);
-    const article = document.querySelector(this.transcriptSelector) as HTMLElement;
+    const article = document.querySelector(this.transcript) as HTMLElement;
 
     if (!article) {
       debug('no article');
@@ -440,7 +440,7 @@ export class LitePlayer extends LitElement {
             offset,
             pseudo: !!time,
             pseudoTime: time,
-            transcript: this.transcriptSelector,
+            transcript: this.transcript,
             media: section.media_reference.target,
             timedText,
             clip,
@@ -671,9 +671,9 @@ export class LitePlayer extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
 
-    if (!this.transcriptSelector) return;
+    if (!this.transcript) return;
 
-    const article = document.querySelector(this.transcriptSelector) as HTMLElement;
+    const article = document.querySelector(this.transcript) as HTMLElement;
     if (!article) return;
 
     // Set up mutation observer
