@@ -483,7 +483,7 @@ export async function generateBlackVideoURL(durationSeconds: number): Promise<st
   const ctx = canvas.getContext('2d')!;
 
   // Paint the single black frame once
-  ctx.fillStyle = 'green';
+  ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
 
   const output = new Output({
